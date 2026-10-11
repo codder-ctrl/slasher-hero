@@ -3,6 +3,16 @@
 
 export const CHANGELOG = [
   {
+    version: '0.5.1',
+    date: '2026-10-11',
+    notes: [
+      'Çanta artık sağ üstte, menünün hemen altında kendi düğmesinde. Dokununca Ekipman ekranı açılır; çantada daha iyi bir eşya varsa düğmede ünlem belirir.',
+      'Kahraman sekmesindeki büyük Ekipman kutusu kaldırıldı, güçlendirmeler daha yukarıda.',
+      'Güç özeti tek ince satıra indi: simge ve değer yan yana. Bir simgeye dokununca ne olduğu yazar.',
+      'Ekipman ekranında kahraman daha büyük ve daha yukarıda; kılıcının ucu artık kesilmiyor.',
+    ],
+  },
+  {
     version: '0.5.0',
     date: '2026-10-11',
     notes: [

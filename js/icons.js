@@ -135,13 +135,18 @@ export const ICONS = {
 };
 
 // Portrait of an actor (resting pose, facing right), fitted into the square.
+// Portraits that would leave the square get moved back in: the hero's sword reaches past the
+// right edge, so he stands a little left and higher.
+const PORTRAIT_SHIFT = { hero: [-9, -2] };
+
 function portrait(g, id, look) {
   const def = ACTORS[id];
   const P = { ...def.rest, ...(def.idle ? def.idle(0.4, look) : null), y: 0, blink: 0, alpha: 1 };
   const h = def.height;
   const s = 52 / (h + 4);
+  const [dx, dy] = PORTRAIT_SHIFT[id] || [0, 0];
   // Flying actors are drawn around their origin rather than standing on it.
-  at(g, 32, def.hover ? 40 : 60, 0, () => def.draw(g, P, look, null), s);
+  at(g, 32 + dx, (def.hover ? 40 : 60) + dy, 0, () => def.draw(g, P, look, null), s);
 }
 
 // ---- Hero defense and quests ----
@@ -251,6 +256,19 @@ ICONS.menuList = (g) => {
     blob(g, circle(15, y, 5), '#fff8e6', { ow: 2.4, depth: 1.2 });
     blob(g, roundRect(25, y - 4.5, 28, 9, 4.5), '#fff8e6', { ow: 2.4, depth: 1.4 });
   }
+};
+
+// The bag button under the menu, in the same cream style: a satchel with a flap and handle.
+ICONS.bagMenu = (g) => {
+  const handle = (c) => { c.moveTo(23, 22); c.arc(32, 22, 9, Math.PI, 0); };
+  line(g, handle, INK, 8.4);
+  line(g, handle, '#fff8e6', 3.6);
+  blob(g, roundRect(9, 20, 46, 37, 9), '#fff8e6', { ow: 2.4, depth: 1.6 });
+  blob(g, (c) => {
+    c.moveTo(9, 31); c.lineTo(9, 28); c.quadraticCurveTo(9, 20, 17, 20); c.lineTo(47, 20);
+    c.quadraticCurveTo(55, 20, 55, 28); c.lineTo(55, 31); c.lineTo(37, 38); c.quadraticCurveTo(32, 40, 27, 38); c.closePath();
+  }, '#fff8e6', { ow: 2.4, depth: 1.2 });
+  blob(g, roundRect(28, 34, 8, 9, 2.4), '#fff8e6', { ow: 2.2, depth: 0.8 });
 };
 
 ICONS.daily = (g) => {

@@ -8,7 +8,7 @@ import { VERSION } from './changelog.js';
 import { createPetPage } from './ui-pets.js';
 import { createDungeonPage } from './ui-dungeon.js';
 import { createWindows } from './ui-windows.js';
-import { createGearCard, createGearScreen } from './ui-gear.js';
+import { createBagButton, createGearScreen } from './ui-gear.js';
 import { createSoulTree } from './ui-souls.js';
 
 // DOM side of the game: HUD over the battle, the tabbed panel below it and modals.
@@ -185,7 +185,7 @@ export function createUI(h) {
     return c;
   });
 
-  // Pages can also open windows (the Ekipman card opens the Ekipman window).
+  // Pages can also open windows; the bag button opens the Ekipman screen.
   const uiHandlers = Object.assign(Object.create(h), {
     openWindow: (name, opts) => { windows.open(name, opts); lastPanel = 0; },
     openGear: (slot) => { gearScreen.open(slot); lastPanel = 0; },
@@ -194,7 +194,7 @@ export function createUI(h) {
   const petPage = createPetPage(pageTools);
   const dungeonPage = createDungeonPage(pageTools);
   const windows = createWindows(pageTools);
-  const gearCard = createGearCard(pageTools);
+  const bagButton = createBagButton(pageTools);
   const gearScreen = createGearScreen(pageTools);
   const soulTree = createSoulTree(pageTools);
 
@@ -275,11 +275,20 @@ export function createUI(h) {
     el.skillBar.hidden = !any;
   }
 
-  const summaryRows = ['Dokunuş', 'Kritik', 'Altın', 'Can', 'Savunma', 'Ruh bonusu'].map((label) => {
-    const row = make('div', 'sum-cell');
+  // One thin strip of symbols and values; a tap on a symbol names it.
+  const summaryRows = [
+    ['swordIcon', 'Dokunuş hasarı'], ['target', 'Kritik şansı ve çarpanı'], ['coinIcon', 'Altın çarpanı'],
+    ['heart', 'Can'], ['shield', 'Savunma (azalan hasar)'], ['soul', 'Ruh bonusu'],
+  ].map(([name, label]) => {
+    const cell = make('span', 'sum-stat');
+    cell.title = label;
+    const img = make('img');
+    img.alt = label;
+    img.src = icon(name, null, 18);
     const value = make('b');
-    row.append(make('span', null, label), value);
-    el.summary.append(row);
+    cell.append(img, value);
+    cell.addEventListener('click', () => toast(label));
+    el.summary.append(cell);
     return value;
   });
 
@@ -309,7 +318,8 @@ export function createUI(h) {
     set(summaryRows[4], pct(1 - L.damageTakenMultiplier(L.heroArmor(state))));
     set(summaryRows[5], `+${pct(state.souls * SOUL_BONUS)}`);
 
-    tabButton('hero').classList.toggle('badge', gearCard.update(state) || heroAfford);
+    bagButton.update(state);
+    tabButton('hero').classList.toggle('badge', heroAfford);
     tabButton('pet').classList.toggle('badge', petPage.update(state, amount));
     tabButton('dungeon').classList.toggle('badge', dungeonPage.update(state));
     tabButton('skills').classList.toggle('badge', updateSkillCards(state, amount));

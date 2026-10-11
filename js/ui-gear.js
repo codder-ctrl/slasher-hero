@@ -1,7 +1,7 @@
 import { EQUIP, EQUIP_SLOTS, EQUIP_STATS, RARITIES, STAT_ORDER } from './config.js';
 import * as G from './gear.js';
 
-// Equipment UI: the card on the Kahraman tab and the Ekipman screen, a full-screen overlay of
+// Equipment UI: the bag button under the menu and the Ekipman screen, a full-screen overlay of
 // its own (the hero with the three slots, equipped totals, auto-salvage, the bag, the chest
 // and an item card popup). Never changes state: actions go through the handlers.
 
@@ -78,35 +78,16 @@ function compareToWorn(state, item) {
   return a > b ? 1 : a < b ? -1 : 0;
 }
 
-// ---- Kahraman tab card ----
+// ---- Bag button (under the menu button, top right of the battle) ----
 
-export function createGearCard(tools) {
-  const { h, make, set } = tools;
-  const card = $('gear-card');
-  const head = make('div', 'gear-head');
-  const title = make('b', null, 'Ekipman');
-  const bagBtn = make('button', 'btn small');
-  bagBtn.type = 'button';
-  bagBtn.addEventListener('click', () => h.openGear());
-  head.append(title, bagBtn);
-  const row = make('div', 'gear-slots');
-  const slots = EQUIP_SLOTS.map((slot) => {
-    const t = itemTile(tools, () => h.openGear(slot.id));
-    const wrap = make('div', 'gear-slot');
-    wrap.append(t.tile, make('span', 'gear-label', slot.name));
-    row.append(wrap);
-    return { slot, t };
-  });
-  card.append(head, row);
+export function createBagButton({ h }) {
+  const btn = $('bag-btn');
+  btn.addEventListener('click', () => h.openGear());
   return {
-    // Returns whether the bag holds something better than what's worn (tab badge).
+    // Badge when the bag holds something better than what's worn.
     update(state) {
-      const eq = state.equipment;
-      for (const { slot, t } of slots) t.show(eq.slots[slot.id], slot.id);
-      const better = eq.bag.some((it) => compareToWorn(state, it) > 0);
-      set(bagBtn, `Çanta ${eq.bag.length}/${EQUIP.bagSize}${better ? ' ★' : ''}`);
-      bagBtn.classList.toggle('accent', better);
-      return better;
+      const better = state.equipment.bag.some((it) => compareToWorn(state, it) > 0);
+      btn.classList.toggle('badge', better);
     },
   };
 }
@@ -121,7 +102,7 @@ export function createGearScreen(tools) {
   const head = make('div', 'gs-head');
   const headIcon = make('img');
   headIcon.alt = '';
-  headIcon.src = icon('chest');
+  headIcon.src = icon('bagMenu');
   const close = make('button', 'close-btn', '✕');
   close.type = 'button';
   close.setAttribute('aria-label', 'Kapat');
@@ -293,7 +274,7 @@ export function createGearScreen(tools) {
     const lookKey = `${eq.slots.weapon?.rarity ?? -1}:${eq.slots.helm?.rarity ?? -1}`;
     if (portrait.dataset.key !== lookKey) {
       portrait.dataset.key = lookKey;
-      portrait.src = icon('actor:hero', { weapon: eq.slots.weapon?.rarity ?? -1, helm: eq.slots.helm?.rarity ?? -1 }, 132);
+      portrait.src = icon('actor:hero', { weapon: eq.slots.weapon?.rarity ?? -1, helm: eq.slots.helm?.rarity ?? -1 }, 150);
     }
     for (const s of EQUIP_SLOTS) slotTiles[s.id].show(eq.slots[s.id], s.id);
 
