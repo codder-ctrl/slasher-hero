@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Slasher Hero",
+  "short_name": "Slasher Hero",
+  "description": "Masal kitabı çizimli kılıç kahramanı: tıklama ve gelişim oyunu.",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2a1b17",
+  "theme_color": "#2a1b17",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

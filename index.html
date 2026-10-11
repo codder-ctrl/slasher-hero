@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2a1b17">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Slasher Hero">
+  <title>Slasher Hero</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Lilita+One&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div id="app">
+    <section id="battle" aria-label="Savaş alanı">
+      <canvas id="scene"></canvas>
+      <button id="version-btn" class="version" type="button" aria-label="Sürüm notları"></button>
+
+      <div id="hud">
+        <div class="hud-top">
+          <div id="gold-pill" class="pill gold"><img data-icon="coinIcon" alt=""><b id="gold">0</b></div>
+          <div class="pill dim"><span>Hasar/sn</span><b id="dps">0</b></div>
+          <div id="souls-pill" class="pill soul" hidden><img data-icon="soul" alt=""><b id="souls">0</b></div>
+        </div>
+
+        <div class="stage-nav">
+          <button id="stage-prev" class="nav-btn" type="button" aria-label="Önceki bölüm">◀</button>
+          <div class="stage-info">
+            <span id="zone-name"></span>
+            <b id="stage-label"></b>
+          </div>
+          <button id="stage-next" class="nav-btn" type="button" aria-label="Sonraki bölüm">▶</button>
+        </div>
+
+        <div class="enemy-info">
+          <div class="enemy-line"><span id="enemy-name"></span><span id="enemy-progress"></span></div>
+          <div class="bar hp-bar"><div id="hp-fill" class="fill"></div><span id="hp-text"></span></div>
+          <div id="timer-bar" class="bar timer-bar" hidden><div id="timer-fill" class="fill"></div><span id="timer-text"></span></div>
+        </div>
+        <button id="auto-btn" class="btn accent" type="button" hidden></button>
+      </div>
+
+      <div id="skill-bar" role="toolbar" aria-label="Yetenekler"></div>
+      <div id="tap-hint" hidden>DOKUN!</div>
+    </section>
+
+    <section id="panel">
+      <div id="buy-bar">
+        <span>Satın al</span>
+        <div class="seg" role="group" aria-label="Satın alma miktarı">
+          <button type="button" data-amount="1">×1</button>
+          <button type="button" data-amount="10">×10</button>
+          <button type="button" data-amount="100">×100</button>
+          <button type="button" data-amount="max">MAKS</button>
+        </div>
+      </div>
+
+      <div id="pages">
+        <div class="page" data-tab="hero">
+          <div id="hero-summary" class="card summary"></div>
+          <div id="upgrade-list" class="list"></div>
+        </div>
+
+        <div class="page" data-tab="pet" hidden>
+          <div class="card pet-show">
+            <img id="pet-img" class="pet-img" alt="">
+            <div class="pet-info">
+              <div class="pet-tags"><span id="pet-rarity" class="rarity"></span><span id="pet-stars" class="stars"></span></div>
+              <b id="pet-name" class="pet-name"></b>
+              <div id="pet-mult" class="item-desc"></div>
+              <div id="pet-form" class="item-note"></div>
+            </div>
+            <button id="pet-evolve" class="buy-btn crystal" type="button"><span id="pet-evolve-label" class="buy-label"></span><span class="buy-cost"><img data-icon="crystal" alt=""><span id="pet-evolve-cost"></span></span></button>
+          </div>
+          <div id="pet-training" class="list"></div>
+          <div class="card info egg">
+            <div class="wallet"><span><img data-icon="gem" alt=""><b id="elmas">0</b> elmas</span><span><img data-icon="crystal" alt=""><b id="pet-kristal">0</b> kristal</span></div>
+            <button id="egg-btn" class="btn big gem" type="button"></button>
+            <p id="egg-rates" class="note"></p>
+            <p class="note">Elmas: ana savaşta ve zindanda her yeni boss ilk kez yenildiğinde kazanılır. Aynı pet tekrar çıkarsa yıldız kazanır.</p>
+          </div>
+          <h3 class="section-title">Koleksiyon <span id="pet-count"></span></h3>
+          <div id="pet-grid" class="pet-grid"></div>
+        </div>
+
+        <div class="page" data-tab="dungeon" hidden>
+          <div class="dg-head">
+            <span>Kat <b id="dg-floor">1</b></span>
+            <span>En iyi <b id="dg-best">0</b></span>
+            <span class="wallet"><img data-icon="crystal" alt=""><b id="dg-kristal">0</b></span>
+          </div>
+          <div class="dg-stage"><canvas id="dungeon-canvas"></canvas></div>
+          <p class="page-hint">Takım kendi kendine savaşır; yenilirse bir kat geri çekilip tekrar dener. Kristalle yoldaş topla ve yükselt.</p>
+          <h3 class="section-title">Takım <span id="team-count"></span></h3>
+          <div id="companion-list" class="list"></div>
+        </div>
+
+        <div class="page" data-tab="skills" hidden>
+          <p class="page-hint">Yetenekleri savaş alanındaki düğmelerle kullan. Kullandıktan sonra bir süre beklemeleri gerekir.</p>
+          <div id="skill-list" class="list"></div>
+        </div>
+
+        <div class="page" data-tab="rebirth" hidden>
+          <div class="card info">
+            <h3><img data-icon="soul" alt="">Yeniden Doğuş</h3>
+            <p>Yolculuğunu baştan başlat, <b>Ruh Taşı</b> kazan. Her ruh taşı tüm hasarını kalıcı olarak <b>%10</b> artırır; böylece her turda daha ileri gidersin.</p>
+            <div class="stat-row"><span>Ruh taşların</span><b id="rb-souls"></b></div>
+            <div class="stat-row"><span>Hasar bonusu</span><b id="rb-bonus"></b></div>
+            <div class="stat-row"><span>Bu turdaki en ileri bölüm</span><b id="rb-stage"></b></div>
+            <div class="stat-row highlight"><span>Doğuşta kazanılacak</span><b id="rb-gain"></b></div>
+            <button id="rb-btn" class="btn soul big" type="button">Yeniden Doğ</button>
+            <p id="rb-note" class="note"></p>
+          </div>
+        </div>
+
+        <div class="page" data-tab="menu" hidden>
+          <div class="card info">
+            <h3>İstatistikler</h3>
+            <div id="stats"></div>
+          </div>
+          <div class="card info">
+            <h3>Ayarlar</h3>
+            <div class="stat-row"><span>Ses efektleri</span><button id="sound-btn" class="btn small" type="button">Açık</button></div>
+            <div class="stat-row"><span>Müzik</span><button id="music-btn" class="btn small" type="button">Açık</button></div>
+          </div>
+          <div class="card info">
+            <h3>Kayıt</h3>
+            <p class="note">İlerleme bu cihazda otomatik kaydedilir. Başka bir cihaza taşımak için kayıt kodunu dışa aktar.</p>
+            <div class="btn-row">
+              <button id="save-btn" class="btn" type="button">Kaydet</button>
+              <button id="export-btn" class="btn" type="button">Dışa Aktar</button>
+              <button id="import-btn" class="btn" type="button">İçe Aktar</button>
+            </div>
+            <button id="reset-btn" class="btn danger" type="button">Her Şeyi Sıfırla</button>
+          </div>
+        </div>
+      </div>
+
+      <nav id="tabs" role="tablist">
+        <button class="tab active" type="button" role="tab" data-tab="hero" aria-selected="true"><img data-icon="tabHero" alt=""><span>Kahraman</span></button>
+        <button class="tab" type="button" role="tab" data-tab="pet" aria-selected="false"><img data-icon="tabPet" alt=""><span>Pet</span></button>
+        <button class="tab" type="button" role="tab" data-tab="dungeon" aria-selected="false"><img data-icon="tabDungeon" alt=""><span>Zindan</span></button>
+        <button class="tab" type="button" role="tab" data-tab="skills" aria-selected="false"><img data-icon="skStorm" alt=""><span>Yetenek</span></button>
+        <button class="tab" type="button" role="tab" data-tab="rebirth" aria-selected="false"><img data-icon="soul" alt=""><span>Doğuş</span></button>
+        <button class="tab" type="button" role="tab" data-tab="menu" aria-selected="false"><img data-icon="menu" alt=""><span>Menü</span></button>
+      </nav>
+    </section>
+
+    <div id="toast" role="status" hidden></div>
+
+    <div id="modal" hidden>
+      <div class="modal-box card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h2 id="modal-title"></h2>
+        <div id="modal-body"></div>
+        <div id="modal-actions" class="btn-row"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

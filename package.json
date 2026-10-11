@@ -1,0 +1,12 @@
+{
+  "name": "slasher-hero",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Telefon öncelikli, tarayıcıda oynanan vektör çizimli kılıç kahramanı tıklama/gelişim oyunu (build adımı yok).",
+  "scripts": {
+    "start": "python -m http.server 8003",
+    "icons": "node tools/icon-server.js",
+    "test": "node --test \"tests/*.test.js\""
+  }
+}

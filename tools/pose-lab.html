@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Pose Lab</title>
+<style>
+  body { margin: 0; background: #2a1b17; color: #fff8e6; font: 13px sans-serif; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+// Development view: every actor, and frames of their actions side by side.
+// Open /tools/pose-lab.html?only=hero to look at one actor.
+import { ACTORS } from '../js/actors.js';
+import { createAnimator } from '../js/anim.js';
+import { ZONES, PETS, COMPANIONS } from '../js/config.js';
+
+const params = new URLSearchParams(location.search);
+const only = params.get('only');
+const ids = params.get('ids')?.split(',');
+const c = document.getElementById('c');
+const g = c.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+const CELL = Number(params.get('cell')) || 120;
+const WRAP = Number(params.get('wrap')) || 0;
+const rows = [];
+
+function looksFor(id) {
+  const zoneEnemy = ZONES.flatMap((z) => z.enemies).find((e) => e.actor === id);
+  if (zoneEnemy) return [{ colors: zoneEnemy.colors }, { colors: zoneEnemy.colors, boss: true }];
+  const pet = PETS.find((p) => p.actor === id);
+  if (pet) return pet.forms.map((f, i) => ({ colors: f.colors, form: i + 1 }));
+  const comp = COMPANIONS.filter((x) => x.actor === id);
+  if (comp.length) return comp.slice(0, 4).map((x) => ({ colors: x.colors, role: x.role, shotColor: x.shotColor }));
+  return [{}];
+}
+
+for (const [id, def] of Object.entries(ACTORS)) {
+  if (only && only !== id) continue;
+  if (ids && !ids.includes(id)) continue;
+  for (const look of looksFor(id)) {
+    const frames = [{ label: 'idle', action: null, p: 0 }];
+    if (params.get('idle')) { rows.push({ id, def, look, frames }); continue; }
+    for (const [name, a] of Object.entries(def.actions)) {
+      const variants = name === 'attack' && id === 'hero' ? [0, 1, 2] : [0];
+      for (const v of variants) for (const p of [0.18, 0.3, 0.4, 0.55, 0.8]) frames.push({ label: `${name}${v ? v : ''} ${p}`, action: name, v, p });
+      if (only) continue;
+      break;
+    }
+    rows.push({ id, def, look, frames });
+  }
+}
+
+// ?idle=1 shows only resting poses, packed into a grid.
+if (params.get('idle')) {
+  const all = rows.flatMap((r) => r.frames.map((f) => ({ ...r, frames: [f] })));
+  rows.length = 0;
+  const per = WRAP || 6;
+  for (let i = 0; i < all.length; i += per) {
+    const chunk = all.slice(i, i + per);
+    rows.push({ multi: chunk, frames: chunk.map((r) => r.frames[0]) });
+  }
+} else if (WRAP) {
+  const split = [];
+  for (const r of rows) for (let i = 0; i < r.frames.length; i += WRAP) split.push({ ...r, frames: r.frames.slice(i, i + WRAP) });
+  rows.length = 0;
+  rows.push(...split);
+}
+const cols = Math.max(...rows.map((r) => r.frames.length));
+c.width = cols * CELL * dpr;
+c.height = rows.length * CELL * dpr;
+c.style.width = cols * CELL + 'px';
+c.style.height = rows.length * CELL + 'px';
+g.scale(dpr, dpr);
+g.fillStyle = '#9cc2a0';
+g.fillRect(0, 0, cols * CELL, rows.length * CELL);
+
+rows.forEach((r0, ri) => {
+  r0.frames.forEach((f, ci) => {
+    const row = r0.multi ? r0.multi[ci] : r0;
+    const anim = createAnimator(row.def, row.look);
+    if (f.action) {
+      const inst = anim.play(f.action, f.v || 0);
+      anim.update(0.1);
+      inst.t = f.p;
+      inst.w = 1;
+    }
+    const P = anim.update(0);
+    const x = ci * CELL;
+    const y = ri * CELL;
+    g.strokeStyle = 'rgba(0,0,0,0.15)';
+    g.strokeRect(x, y, CELL, CELL);
+    g.fillStyle = '#2a1b17';
+    g.fillText(`${row.id} ${f.label}`, x + 4, y + 12);
+    g.save();
+    g.translate(x + CELL * 0.42, y + CELL - 12);
+    const s = CELL / 125;
+    g.scale(s, s);
+    g.strokeStyle = 'rgba(0,0,0,0.25)';
+    g.beginPath(); g.moveTo(-50, 0); g.lineTo(60, 0); g.stroke();
+    row.def.draw(g, P, row.look, {});
+    g.restore();
+  });
+});
+</script>
+</body>
+</html>

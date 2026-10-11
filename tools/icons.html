@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Slasher Hero icons</title>
+<style>
+  body { margin: 16px; background: #2a1b17; color: #fff8e6; font: 14px sans-serif; }
+  canvas { margin: 6px; vertical-align: top; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0 / 16px 16px; }
+</style>
+</head>
+<body>
+<p id="status">Çiziliyor…</p>
+<script type="module">
+// Draws the app icons with the game's vector art and posts them to tools/icon-server.js.
+import { ACTORS } from '../js/actors.js';
+import { at, blob, glow, flat, circle, roundRect, scallop, INK } from '../js/paint.js';
+import { mulberry32 } from '../js/scenery.js';
+
+// The icon scene in a 100-unit square: sky, sun, hills, a slash arc and the hero's upper body.
+function scene(g, full) {
+  const sky = g.createLinearGradient(0, 0, 0, 100);
+  sky.addColorStop(0, '#4fa8e8');
+  sky.addColorStop(1, '#d8f2f4');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, 100, 100);
+  glow(g, 78, 22, 30, '#fff4c0', 0.7);
+  flat(g, circle(78, 22, 9), '#fff4c0');
+  const rand = mulberry32(7);
+  blob(g, scallop(18, 30, 14, 6, 7, 0.5, rand), '#ffffff', { ow: 0.8, depth: 2, shade: '#d4e8f4', ink: '#7aa8c8' });
+  blob(g, (c) => { c.moveTo(-5, 110); c.lineTo(-5, 72); c.quadraticCurveTo(30, 58, 60, 70); c.quadraticCurveTo(85, 62, 105, 68); c.lineTo(105, 110); c.closePath(); }, '#6cbf55', { ow: 1.2, depth: 3 });
+  blob(g, (c) => { c.moveTo(-5, 110); c.lineTo(-5, 86); c.quadraticCurveTo(50, 80, 105, 88); c.lineTo(105, 110); c.closePath(); }, '#82c95a', { ow: 1.2, depth: 2 });
+  // Slash arc behind the hero.
+  g.save();
+  g.globalAlpha = 0.85;
+  flat(g, (c) => { c.moveTo(18, 18); c.quadraticCurveTo(92, 14, 86, 84); c.quadraticCurveTo(80, 30, 18, 18); c.closePath(); }, '#ffffff');
+  g.restore();
+  // Hero, scaled up so the head and sword fill the frame.
+  const def = ACTORS.hero;
+  const P = { ...def.rest, armF: -1.6, elbowF: -0.6, sword: 1.0, mouth: 0.8, cape: 1, plume: 1 };
+  at(g, full ? 44 : 44, full ? 122 : 118, -0.08, () => def.draw(g, P, {}, null), full ? 1.28 : 1.2);
+}
+
+function make(size, { pad = 0, round = 0, full = false } = {}) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const s = size / 100;
+  g.scale(s, s);
+  if (round) {
+    g.save();
+    g.beginPath();
+    roundRect(pad, pad, 100 - pad * 2, 100 - pad * 2, round)(g);
+    g.clip();
+    g.translate(pad, pad);
+    g.scale((100 - pad * 2) / 100, (100 - pad * 2) / 100);
+    scene(g, full);
+    g.restore();
+    g.beginPath();
+    roundRect(pad, pad, 100 - pad * 2, 100 - pad * 2, round)(g);
+    g.lineWidth = 3;
+    g.strokeStyle = INK;
+    g.stroke();
+  } else {
+    scene(g, full);
+  }
+  return c;
+}
+
+// Just the head for the tiny favicon.
+function favicon() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const g = c.getContext('2d');
+  g.scale(32 / 100, 32 / 100);
+  blob(g, circle(50, 50, 46), '#c8353a', { ow: 4, depth: 6 });
+  const def = ACTORS.hero;
+  at(g, 46, 168, 0, () => def.draw(g, { ...def.rest, armF: 0.4, sword: 3 }, {}, null), 2.1);
+  return c;
+}
+
+const icons = {
+  'icon-192.png': make(192, { pad: 3, round: 18 }),
+  'icon-512.png': make(512, { pad: 3, round: 18 }),
+  // Maskable: full bleed, the art stays inside the central safe zone.
+  'icon-maskable-512.png': make(512, { full: false }),
+  'apple-touch-icon.png': make(180, {}),
+  'favicon-32.png': favicon(),
+};
+
+const status = document.getElementById('status');
+let done = 0;
+for (const [name, canvas] of Object.entries(icons)) {
+  document.body.append(canvas);
+  const blobData = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+  const res = await fetch(`/save?name=${name}`, { method: 'POST', body: blobData }).catch(() => null);
+  if (res?.ok) done++;
+}
+status.textContent = done === Object.keys(icons).length ? `${done} ikon yazıldı.` : `Sunucuya gönderilemedi (${done} yazıldı). npm run icons ile açtın mı?`;
+</script>
+</body>
+</html>
