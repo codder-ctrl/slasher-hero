@@ -53,7 +53,7 @@ export function newGame(rng = Math.random, now = Date.now()) {
     soulPoints: 0,                   // unspent soul tree points
     soulTree: {},                    // node id -> level
     petFx: { timer: 3, burn: 0, burnDps: 0 },  // live pet ability timers; not saved
-    settings: { sound: true, music: true, buyAmount: 1 },
+    settings: { sound: true, music: true, buyAmount: 1, autoSalvage: false },
     daily: { last: '', streak: 0 },  // last claim as a local YYYY-MM-DD and the streak it made
     mail: { claimed: [], read: [] },
     seen: { version: '', news: [] }, // what the player has opened in the blog (for the badge)
@@ -927,6 +927,7 @@ export function loadState(raw, rng = Math.random, now = Date.now()) {
   for (const k of Object.keys(s.stats)) s.stats[k] = num(raw.stats?.[k], s.stats[k]);
   if (typeof raw.settings?.sound === 'boolean') s.settings.sound = raw.settings.sound;
   if (typeof raw.settings?.music === 'boolean') s.settings.music = raw.settings.music;
+  if (typeof raw.settings?.autoSalvage === 'boolean') s.settings.autoSalvage = raw.settings.autoSalvage;
   if (BUY_AMOUNTS.includes(raw.settings?.buyAmount)) s.settings.buyAmount = raw.settings.buyAmount;
   const day = /^\d{4}-\d{2}-\d{2}$/;
   if (day.test(raw.daily?.last)) s.daily.last = raw.daily.last;

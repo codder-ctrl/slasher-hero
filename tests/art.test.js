@@ -6,7 +6,7 @@ import { createAnimator } from '../js/anim.js';
 import { ICONS } from '../js/icons.js';
 import { paintBackdrop, paintDungeon, createWeather, THEME_IDS } from '../js/scenery.js';
 import { createFx } from '../js/fx.js';
-import { UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES, MAIL, SPECIALS } from '../js/config.js';
+import { UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES, MAIL, SPECIALS, EQUIP_STATS, STAT_ORDER } from '../js/config.js';
 import { NEWS } from '../js/news.js';
 import { existsSync } from 'node:fs';
 
@@ -52,6 +52,8 @@ test('content tables point at existing actors and icons', () => {
   for (const p of PETS) assert.ok(ACTORS[p.actor], p.id);
   for (const c of COMPANIONS) assert.ok(ACTORS[c.actor], c.id);
   for (const d of [...UPGRADES, ...SKILLS, PET_TRAINING]) assert.ok(ICONS[d.icon], d.id);
+  for (const [k, st] of Object.entries(EQUIP_STATS)) assert.ok(ICONS[st.icon], `stat ${k}`);
+  assert.deepEqual([...STAT_ORDER].sort(), Object.keys(EQUIP_STATS).sort(), 'STAT_ORDER lists every stat once');
 });
 
 test('every icon the page asks for exists', () => {

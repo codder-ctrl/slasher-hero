@@ -1,8 +1,9 @@
-import { EQUIP, EQUIP_SLOTS, EQUIP_STATS, RARITIES } from './config.js';
+import { EQUIP, EQUIP_SLOTS, EQUIP_STATS, RARITIES, STAT_ORDER } from './config.js';
 
 // Equipment rules: pure, no DOM. Items live in state.equipment = { slots: { weapon, helm,
-// charm }, bag: [item], next } and look like { uid, slot, rarity, level, stats: [{ k, roll }] }.
-// `rarity` is an index into RARITIES. Events pushed: 'item' { item, source, salvaged }.
+// charm }, bag: [item], next } and look like { uid, slot, rarity, level, stats: [{ k, roll }],
+// locked? }. `rarity` is an index into RARITIES. Locked items are never salvaged.
+// Events pushed: 'item' { item, source, salvaged, auto }.
 
 export const findSlot = (id) => EQUIP_SLOTS.find((s) => s.id === id);
 
@@ -31,7 +32,10 @@ export function makeItem(slotId, rarity, rng = Math.random, uid = 0) {
 export const statValue = (item, stat) =>
   EQUIP_STATS[stat.k].base * EQUIP.rarityMult[item.rarity] * stat.roll * (1 + EQUIP.levelStep * (item.level - 1));
 
-export const itemStats = (item) => item.stats.map((st) => ({ k: st.k, value: statValue(item, st) }));
+// The item's stats in display order (STAT_ORDER).
+export const itemStats = (item) => item.stats
+  .map((st) => ({ k: st.k, value: statValue(item, st) }))
+  .sort((a, b) => STAT_ORDER.indexOf(a.k) - STAT_ORDER.indexOf(b.k));
 
 export const itemName = (item) => findSlot(item.slot).names[item.rarity];
 
@@ -64,20 +68,46 @@ export function findItem(state, uid) {
   return null;
 }
 
-// A new random item into the bag. With the bag full it is salvaged for kristal at once.
+// Whether an item is weaker than what's worn in its slot (an empty slot makes nothing weaker).
+export function isWorse(state, item) {
+  const worn = state.equipment.slots[item.slot];
+  return !!worn && worn.uid !== item.uid && itemScore(item) < itemScore(worn);
+}
+
+// A new random item into the bag. It is salvaged for kristal at once when the bag is full, or
+// when it is weaker than the worn one and Otomatik parçala (settings.autoSalvage) is on.
 export function dropItem(state, rng = Math.random, events = [], source = 'boss') {
   const eq = state.equipment;
   const slot = EQUIP_SLOTS[Math.floor(rng() * EQUIP_SLOTS.length)].id;
   const item = makeItem(slot, rollRarityIndex(rng), rng, eq.next++);
   let salvaged = 0;
-  if (eq.bag.length >= EQUIP.bagSize) {
+  const auto = !!state.settings?.autoSalvage && isWorse(state, item);
+  if (auto || eq.bag.length >= EQUIP.bagSize) {
     salvaged = salvageValue(item);
     state.kristal += salvaged;
   } else {
     eq.bag.push(item);
   }
-  events.push({ type: 'item', item, source, salvaged });
+  events.push({ type: 'item', item, source, salvaged, auto });
   return item;
+}
+
+export function setLock(state, uid, locked) {
+  const found = findItem(state, uid);
+  if (!found) return false;
+  if (locked) found.item.locked = true;
+  else delete found.item.locked;
+  return true;
+}
+
+// Unlocked bag items weaker than what's worn: what "Zayıfları parçala" would break down.
+export const worseItems = (state) => state.equipment.bag.filter((it) => !it.locked && isWorse(state, it));
+
+export function salvageWorse(state) {
+  let kristal = 0;
+  const items = worseItems(state);
+  for (const it of items) kristal += salvage(state, it.uid);
+  return { count: items.length, kristal };
 }
 
 export function openChest(state, rng = Math.random, events = []) {
@@ -122,7 +152,7 @@ export function upgradeItem(state, uid) {
 export function salvage(state, uid) {
   const eq = state.equipment;
   const i = eq.bag.findIndex((it) => it.uid === uid);
-  if (i < 0) return 0;
+  if (i < 0 || eq.bag[i].locked) return 0;
   const value = salvageValue(eq.bag[i]);
   eq.bag.splice(i, 1);
   state.kristal += value;
@@ -151,7 +181,9 @@ export function loadEquipment(raw) {
     }
     if (!stats.length || stats[0].k !== slot.stats[0]) return null;
     seen.add(uid);
-    return { uid, slot: slot.id, rarity, level, stats };
+    const out = { uid, slot: slot.id, rarity, level, stats };
+    if (it.locked === true) out.locked = true;
+    return out;
   };
   for (const s of EQUIP_SLOTS) eq.slots[s.id] = clean(raw.slots?.[s.id], s.id);
   if (Array.isArray(raw.bag)) for (const it of raw.bag) { const c = clean(it); if (c && eq.bag.length < EQUIP.bagSize) eq.bag.push(c); }

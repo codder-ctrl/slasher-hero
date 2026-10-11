@@ -8,7 +8,7 @@ import { VERSION } from './changelog.js';
 import { createPetPage } from './ui-pets.js';
 import { createDungeonPage } from './ui-dungeon.js';
 import { createWindows } from './ui-windows.js';
-import { createGearCard } from './ui-gear.js';
+import { createGearCard, createGearScreen } from './ui-gear.js';
 import { createSoulTree } from './ui-souls.js';
 
 // DOM side of the game: HUD over the battle, the tabbed panel below it and modals.
@@ -186,12 +186,16 @@ export function createUI(h) {
   });
 
   // Pages can also open windows (the Ekipman card opens the Ekipman window).
-  const uiHandlers = Object.assign(Object.create(h), { openWindow: (name, opts) => { windows.open(name, opts); lastPanel = 0; } });
+  const uiHandlers = Object.assign(Object.create(h), {
+    openWindow: (name, opts) => { windows.open(name, opts); lastPanel = 0; },
+    openGear: (slot) => { gearScreen.open(slot); lastPanel = 0; },
+  });
   const pageTools = { h: uiHandlers, icon, make, set, makeCard, fmt };
   const petPage = createPetPage(pageTools);
   const dungeonPage = createDungeonPage(pageTools);
   const windows = createWindows(pageTools);
   const gearCard = createGearCard(pageTools);
+  const gearScreen = createGearScreen(pageTools);
   const soulTree = createSoulTree(pageTools);
 
   const skillCards = SKILLS.map((def) => {
@@ -442,6 +446,7 @@ export function createUI(h) {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!el.modal.hidden) closeModal();
+    else if (gearScreen.isOpen) gearScreen.close();
     else if (windows.isOpen) windows.close();
   });
 
@@ -472,6 +477,7 @@ export function createUI(h) {
         if (tab === 'rebirth') updateRebirth(state);
         if (windows.current === 'settings') updateMenu(state);
         windows.update(state);
+        gearScreen.update(state);
       }
     },
     refresh() { lastPanel = 0; },
@@ -481,9 +487,9 @@ export function createUI(h) {
     openModal,
     closeModal,
     get modalOpen() { return !el.modal.hidden; },
-    get windowOpen() { return windows.isOpen; },
+    get windowOpen() { return windows.isOpen || gearScreen.isOpen; },
     openWindow: (name, opts) => { windows.open(name, opts); lastPanel = 0; },
-    closeWindow: () => windows.close(),
+    closeWindow: () => { windows.close(); gearScreen.close(); },
     toast,
     pulseGold,
     make,

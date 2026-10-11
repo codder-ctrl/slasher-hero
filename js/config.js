@@ -87,7 +87,7 @@ export const ATTACK = {
   first: 3,
   every: 6,
   windup: 1.4,
-  taps: 8,
+  taps: 5,
   stun: 2.5,
   stunBonus: 1.5,      // damage multiplier on a stunned enemy
   atkBase: 6,
@@ -225,18 +225,21 @@ export const EQUIP_SLOTS = [
   { id: 'helm',   name: 'Kask',   stats: ['hp', 'armor', 'stun'],    names: ['Deri Kask', 'Çelik Miğfer', 'Ejder Miğferi', 'Yıldız Tacı'] },
   { id: 'charm',  name: 'Tılsım', stats: ['gold', 'pet', 'combo'],   names: ['Bakır Tılsım', 'Gümüş Tılsım', 'Ejder Gözü', 'Yıldız Kalbi'] },
 ];
-// kind: 'pct' shows +%, 'mult' +×, 'flat' +n, 'sec' +n sn.
+// kind: 'pct' shows +%, 'mult' +×, 'flat' +n, 'sec' +n sn. `icon` is the small symbol the
+// item cards show instead of the name.
 export const EQUIP_STATS = {
-  tap:     { name: 'Dokunuş hasarı', base: 0.25, kind: 'pct' },
-  critDmg: { name: 'Kritik çarpanı', base: 0.3,  kind: 'mult' },
-  boss:    { name: 'Boss hasarı',    base: 0.3,  kind: 'pct' },
-  hp:      { name: 'Can',            base: 0.25, kind: 'pct' },
-  armor:   { name: 'Zırh',           base: 15,   kind: 'flat' },
-  stun:    { name: 'Sersemletme',    base: 0.3,  kind: 'sec' },
-  gold:    { name: 'Altın',          base: 0.15, kind: 'pct' },
-  pet:     { name: 'Pet hasarı',     base: 0.25, kind: 'pct' },
-  combo:   { name: 'Kombo süresi',   base: 0.08, kind: 'sec' },
+  tap:     { name: 'Dokunuş hasarı', base: 0.25, kind: 'pct',  icon: 'swordIcon' },
+  critDmg: { name: 'Kritik çarpanı', base: 0.3,  kind: 'mult', icon: 'bolt' },
+  boss:    { name: 'Boss hasarı',    base: 0.3,  kind: 'pct',  icon: 'crownIcon' },
+  hp:      { name: 'Can',            base: 0.25, kind: 'pct',  icon: 'heart' },
+  armor:   { name: 'Zırh',           base: 15,   kind: 'flat', icon: 'shield' },
+  stun:    { name: 'Sersemletme',    base: 0.3,  kind: 'sec',  icon: 'stunIcon' },
+  gold:    { name: 'Altın',          base: 0.15, kind: 'pct',  icon: 'coinIcon' },
+  pet:     { name: 'Pet hasarı',     base: 0.25, kind: 'pct',  icon: 'paw' },
+  combo:   { name: 'Kombo süresi',   base: 0.08, kind: 'sec',  icon: 'comboIcon' },
 };
+// Display order everywhere: attack first, health second (as the user asked), then the rest.
+export const STAT_ORDER = ['tap', 'hp', 'critDmg', 'boss', 'armor', 'stun', 'pet', 'gold', 'combo'];
 export const EQUIP = {
   rarityMult: [1, 1.8, 3, 5],     // by RARITIES index
   statCount: [1, 2, 2, 3],

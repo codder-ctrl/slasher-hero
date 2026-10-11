@@ -3,6 +3,18 @@
 
 export const CHANGELOG = [
   {
+    version: '0.5.0',
+    date: '2026-10-11',
+    notes: [
+      'Boss saldırısını kesmek kolaylaştı: 1.4 saniyede 5 dokunuş yeterli.',
+      'Yeni Ekipman ekranı: ortada kahramanın, etrafında yuvalar, altında çanta. Eşyaya dokununca eşya kartı açılır.',
+      'Eşya kilidi: kilitli eşyalar asla parçalanmaz.',
+      'Otomatik parçala: açıkken, takılı olandan zayıf yeni eşyalar düşer düşmez kristale döner. "Zayıfları parçala" ile çantayı tek dokunuşla temizle.',
+      'Özellikler artık küçük simgelerle kısa ve net. Sıra: saldırı, can, sonra diğerleri.',
+      'Düzeltme: iki parmakla yakınlaştırma ve çift dokunuşla büyütme kapatıldı.',
+    ],
+  },
+  {
     version: '0.4.0',
     date: '2026-10-11',
     notes: [

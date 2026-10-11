@@ -139,6 +139,42 @@ test('equipment survives saves and rebirth; bad items are dropped', () => {
   assert.equal(bad.equipment.next, 3);
 });
 
+test('locked items are never salvaged; weaker ones can go automatically or in bulk', () => {
+  const s = fresh();
+  s.equipment.slots.weapon = G.makeItem('weapon', 3, () => 0.5, 99);
+  const weak = G.dropItem(s, seq([0, 0.01]), []);
+  assert.equal(weak.slot, 'weapon');
+  assert.ok(G.isWorse(s, weak));
+  assert.ok(G.setLock(s, weak.uid, true));
+  assert.equal(G.salvage(s, weak.uid), 0, 'locked');
+  assert.deepEqual(G.worseItems(s), []);
+  G.setLock(s, weak.uid, false);
+  const other = G.dropItem(s, seq([0, 0.01]), []);
+  assert.equal(G.worseItems(s).length, 2);
+  const res = G.salvageWorse(s);
+  assert.equal(res.count, 2);
+  assert.equal(res.kristal, G.salvageValue(weak) + G.salvageValue(other));
+  assert.equal(s.equipment.bag.length, 0);
+  // Otomatik parçala: weaker drops turn into kristal at once; better ones and empty slots stay.
+  s.settings.autoSalvage = true;
+  const events = [];
+  G.dropItem(s, seq([0, 0.01]), events);
+  assert.ok(events[0].auto && events[0].salvaged > 0);
+  assert.equal(s.equipment.bag.length, 0);
+  G.dropItem(s, seq([0.5, 0.01]), events);
+  assert.equal(s.equipment.bag.length, 1, 'nothing worn in the helm slot, so it is kept');
+  // Locks and the setting survive a save.
+  G.setLock(s, s.equipment.bag[0].uid, true);
+  const round = L.loadState(JSON.parse(JSON.stringify(L.serializeState(s))), noCrit);
+  assert.equal(round.equipment.bag[0].locked, true);
+  assert.equal(round.settings.autoSalvage, true);
+});
+
+test('item stats show in the fixed order: attack, health, then the rest', () => {
+  const item = { uid: 1, slot: 'charm', rarity: 3, level: 1, stats: [{ k: 'gold', roll: 1 }, { k: 'combo', roll: 1 }, { k: 'pet', roll: 1 }] };
+  assert.deepEqual(G.itemStats(item).map((x) => x.k), ['pet', 'gold', 'combo']);
+});
+
 // ---- Soul tree ----
 
 test('soul tree nodes cost rising points, cap at their max and change the numbers', () => {

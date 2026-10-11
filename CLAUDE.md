@@ -60,7 +60,10 @@ Repo: `codder-ctrl/slasher-hero` (public). GitHub Pages serves the repo root of 
   - **Variants.** Ordinary enemies from `SPECIALS.minStage` roll a `variant`: `goblin` (flees after `flee` s, ×gold), `elite` (×HP, ×gold, attacks), or `armored` (non-crits ×`nonCrit`).
   - **Tuning (v0.4, with equipment).** Auto-equipping drops, without upgrading them, moves the 4-hour stage from ~90 to ~100, and stage 80 from ~57 to ~22 minutes (`node tools/sim.js --share 0.15`, compare `--no-gear`).
   - **Tuning (v0.3).** A player keeping ~15% of their gold in Dayanıklılık + Demir Zırh survives about 5 boss hits at the frontier; skipping defense makes bosses past ~stage 25 a race against the first hit. Active pacing at 5 taps/s with that split: stage 20 ≈ 3 min, 50 ≈ 15 min, ~90 after 4 h (Piksel Savaşçı: 3.7 min, 19 min, 85).
-- **Equipment** (`gear.js`, `ui-gear.js`) — `state.equipment = { slots: { weapon, helm, charm }, bag, next }`, with items `{ uid, slot, rarity (RARITIES index), level, stats: [{ k, roll }] }`.
+- **Equipment** (`gear.js`, `ui-gear.js`) — `state.equipment = { slots: { weapon, helm, charm }, bag, next }`, with items `{ uid, slot, rarity (RARITIES index), level, stats: [{ k, roll }], locked? }`.
+  - **UI.** The Ekipman screen is its own overlay (`#gear-screen`, `createGearScreen`), not a menu window. It shows the hero portrait with the worn gear between the slots, then the worn totals, Otomatik parçala and Zayıfları parçala, the bag (▲/▼ against what's worn, a lock badge) and an item card popup.
+  - **Stat display.** Stats show as small symbol chips (`EQUIP_STATS[k].icon`) in `STAT_ORDER`: attack, then health (the user asked for that), then the rest.
+  - **Locking and salvage.** Locked items are never salvaged. With `settings.autoSalvage` on, drops weaker than the worn item (`isWorse`, by `itemScore`) turn into kristal at once.
   - **Stats.** An item always has its slot's first stat, plus more by rarity. A stat is worth `base × rarityMult × roll × (1 + levelStep × (level − 1))`. `gearTotals(state)` sums the worn items, and logic.js applies them:
     - `tap` and `boss` in tapDamage and in tap() against bosses
     - `critDmg` in critMultiplier
@@ -99,6 +102,13 @@ Repo: `codder-ctrl/slasher-hero` (public). GitHub Pages serves the repo root of 
 - Saved data is untrusted: anything new in the state needs a matching line in `loadState`. Bump `SAVE_VERSION` and migrate when the shape changes incompatibly.
 - Balance numbers live in `config.js` and still match Piksel Savaşçı; re-check pacing with a simulation when changing them (stage 20 at ~4 min with the starter dog, wall around stage 80).
 - Put text into the DOM with `textContent`, not `innerHTML`.
+- No zoom (the user asked):
+  - the viewport meta locks the scale
+  - `html, body` have `touch-action: pan-x pan-y`, which also blocks double-tap zoom
+  - main.js cancels iOS `gesture*` events, multi-touch `touchmove` and ctrl+wheel
+
+  Don't block `touchend` to stop double taps: that also eats quick repeated taps on buttons.
+- Boss wind-ups need `ATTACK.taps` = 5 taps in 1.4 s, as the user asked after trying 8. A player tapping steadily at 5/s now interrupts without noticing, so defense matters mostly for casual and idle play.
 - PWA: a new file the page loads must be added to `SHELL` in `sw.js` or `npm test` fails. The worker fetches game files with `cache: 'no-cache'`: without it the browser's HTTP cache (GitHub Pages: 10 minutes; locally, heuristic caching) served stale modules next to fresh ones after a change. If a local edit doesn't show, update the worker (`reg.update()`) and reload twice.
 - Icons are generated: run `npm run icons` and open the printed URL in a browser; `tools/icons.html` draws them and the server writes `icons/`. Don't edit the PNGs.
 - Keep drawing code free of per-frame allocations that grow (no new canvases or gradients cached forever per frame); everything is redrawn every frame.

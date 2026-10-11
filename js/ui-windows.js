@@ -3,7 +3,6 @@ import { CHANGELOG, VERSION } from './changelog.js';
 import { NEWS } from './news.js';
 import * as L from './logic.js';
 import { coverUrl } from './icons.js';
-import { gearView } from './ui-gear.js';
 
 // The top-right menu: a button under the version label opens a square bubble of shortcuts;
 // each opens a parchment window (Günlük Giriş, Posta, Lider Tablosu, Blog, Ayarlar).
@@ -14,7 +13,6 @@ const $ = (id) => document.getElementById(id);
 const WINDOWS = {
   daily: { title: 'Günlük Giriş', icon: 'daily' },
   quests: { title: 'Görevler', icon: 'medal' },
-  gear: { title: 'Ekipman', icon: 'chest' },
   mail: { title: 'Posta', icon: 'mail' },
   leaderboard: { title: 'Lider Tablosu', icon: 'trophy' },
   blog: { title: 'Blog', icon: 'scroll' },
@@ -385,7 +383,7 @@ export function createWindows({ h, icon, make, set, fmt }) {
     return { root: el.settings, update() {} };
   }
 
-  const builders = { gear: (opts) => gearView({ h, icon, make, set, fmt }, opts), daily: dailyView, quests: questsView, mail: mailView, leaderboard: leaderboardView, blog: blogView, settings: settingsView };
+  const builders = { daily: dailyView, quests: questsView, mail: mailView, leaderboard: leaderboardView, blog: blogView, settings: settingsView };
 
   function open(name, opts) {
     setPop(false);

@@ -1,9 +1,9 @@
-import { EQUIP, EQUIP_SLOTS, EQUIP_STATS, RARITIES } from './config.js';
+import { EQUIP, EQUIP_SLOTS, EQUIP_STATS, RARITIES, STAT_ORDER } from './config.js';
 import * as G from './gear.js';
 
-// Equipment UI: the card on the Kahraman tab (three slots and the bag button) and the
-// Ekipman window (slots, the selected item, the bag and the chest). Never changes state:
-// actions go through the handlers (equipItem, upgradeItem, salvageItem, openChest).
+// Equipment UI: the card on the Kahraman tab and the Ekipman screen, a full-screen overlay of
+// its own (the hero with the three slots, equipped totals, auto-salvage, the bag, the chest
+// and an item card popup). Never changes state: actions go through the handlers.
 
 const $ = (id) => document.getElementById(id);
 
@@ -18,22 +18,41 @@ export function formatStat(k, v) {
 
 const itemLook = (item) => ({ slot: item.slot, rarity: item.rarity });
 
-// A square item picture with a rarity frame and a level badge.
+// A compact stat line: the stat's symbol and its value; `diff` > 0 / < 0 adds ▲ / ▼.
+function statChip({ make, icon }, k, text, diff = 0) {
+  const chip = make('span', 'stat-chip');
+  chip.title = EQUIP_STATS[k].name;
+  const img = make('img');
+  img.alt = EQUIP_STATS[k].name;
+  img.src = icon(EQUIP_STATS[k].icon, null, 18);
+  chip.append(img, make('b', null, text));
+  if (diff) chip.append(make('i', diff > 0 ? 'up' : 'down', diff > 0 ? '▲' : '▼'));
+  return chip;
+}
+
+// A square item picture with a rarity frame, level badge, lock and better/worse marks.
 function itemTile({ make, icon }, onClick) {
   const tile = make('button', 'item-tile');
   tile.type = 'button';
   const img = make('img');
   img.alt = '';
   const lvl = make('span', 'item-lvl');
-  tile.append(img, lvl);
+  const lock = make('img', 'item-lock');
+  lock.alt = 'Kilitli';
+  lock.src = icon('lock', null, 16);
+  const mark = make('span', 'item-mark');
+  tile.append(img, lvl, lock, mark);
   tile.addEventListener('click', onClick);
   let key = '';
   return {
     tile,
-    show(item, emptySlot) {
-      const k = item ? `${item.uid}:${item.rarity}:${item.level}` : `empty:${emptySlot}`;
+    show(item, emptySlot, compare = 0) {
+      const k = item ? `${item.uid}:${item.rarity}:${item.level}:${!!item.locked}:${compare}` : `empty:${emptySlot}`;
       if (k === key) return;
       key = k;
+      lock.hidden = !item?.locked;
+      mark.textContent = compare > 0 ? '▲' : compare < 0 ? '▼' : '';
+      mark.className = `item-mark ${compare > 0 ? 'up' : 'down'}`;
       if (item) {
         img.src = icon('item', itemLook(item));
         tile.style.setProperty('--rarity', RARITIES[item.rarity].color);
@@ -50,27 +69,31 @@ function itemTile({ make, icon }, onClick) {
   };
 }
 
-// Whether a bag item would be an upgrade over what's worn in its slot.
-const isBetter = (state, item) => {
+// +1 better than worn, -1 weaker, 0 when nothing worn to compare.
+function compareToWorn(state, item) {
   const worn = state.equipment.slots[item.slot];
-  return !worn || G.itemScore(item) > G.itemScore(worn);
-};
+  if (!worn || worn.uid === item.uid) return worn ? 0 : 1;
+  const a = G.itemScore(item);
+  const b = G.itemScore(worn);
+  return a > b ? 1 : a < b ? -1 : 0;
+}
+
+// ---- Kahraman tab card ----
 
 export function createGearCard(tools) {
-  const { h, make, set, icon } = tools;
+  const { h, make, set } = tools;
   const card = $('gear-card');
   const head = make('div', 'gear-head');
   const title = make('b', null, 'Ekipman');
   const bagBtn = make('button', 'btn small');
   bagBtn.type = 'button';
-  bagBtn.addEventListener('click', () => h.openWindow('gear'));
+  bagBtn.addEventListener('click', () => h.openGear());
   head.append(title, bagBtn);
   const row = make('div', 'gear-slots');
   const slots = EQUIP_SLOTS.map((slot) => {
-    const t = itemTile(tools, () => h.openWindow('gear', { select: slot.id }));
-    const label = make('span', 'gear-label', slot.name);
+    const t = itemTile(tools, () => h.openGear(slot.id));
     const wrap = make('div', 'gear-slot');
-    wrap.append(t.tile, label);
+    wrap.append(t.tile, make('span', 'gear-label', slot.name));
     row.append(wrap);
     return { slot, t };
   });
@@ -80,7 +103,7 @@ export function createGearCard(tools) {
     update(state) {
       const eq = state.equipment;
       for (const { slot, t } of slots) t.show(eq.slots[slot.id], slot.id);
-      const better = eq.bag.some((it) => isBetter(state, it));
+      const better = eq.bag.some((it) => compareToWorn(state, it) > 0);
       set(bagBtn, `Çanta ${eq.bag.length}/${EQUIP.bagSize}${better ? ' ★' : ''}`);
       bagBtn.classList.toggle('accent', better);
       return better;
@@ -88,43 +111,52 @@ export function createGearCard(tools) {
   };
 }
 
-// The Ekipman window. opts.select: a slot id to show first.
-export function gearView(tools, opts = {}) {
+// ---- Ekipman screen ----
+
+export function createGearScreen(tools) {
   const { h, make, set, icon, fmt } = tools;
-  const root = make('div', 'window-view gear-view');
-  let selected = null; // { uid } or { slot }
-  if (opts.select) selected = { slot: opts.select };
+  const screen = $('gear-screen');
+  const panel = make('div', 'gs-panel');
 
-  const slotRow = make('div', 'gear-slots');
-  const slotTiles = EQUIP_SLOTS.map((slot) => {
-    const t = itemTile(tools, () => { selected = { slot: slot.id }; refresh(); });
-    const wrap = make('div', 'gear-slot');
+  const head = make('div', 'gs-head');
+  const headIcon = make('img');
+  headIcon.alt = '';
+  headIcon.src = icon('chest');
+  const close = make('button', 'close-btn', '✕');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Kapat');
+  head.append(headIcon, make('h2', null, 'Ekipman'), close);
+
+  // The hero between the slots: weapon on the left, helm and charm on the right.
+  const stage = make('div', 'gs-hero');
+  const portrait = make('img', 'gs-portrait');
+  portrait.alt = 'Kahraman';
+  const slotTiles = {};
+  const slotWrap = (id) => {
+    const slot = EQUIP_SLOTS.find((s) => s.id === id);
+    const t = itemTile(tools, () => select({ slot: id }));
+    const wrap = make('div', `gear-slot gs-slot-${id}`);
     wrap.append(t.tile, make('span', 'gear-label', slot.name));
-    slotRow.append(wrap);
-    return { slot, t, wrap };
-  });
+    slotTiles[id] = t;
+    return wrap;
+  };
+  const right = make('div', 'gs-col');
+  right.append(slotWrap('helm'), slotWrap('charm'));
+  stage.append(slotWrap('weapon'), portrait, right);
 
-  const detail = make('div', 'card item-detail');
-  const dHead = make('div', 'detail-head');
-  const dImg = make('img', 'detail-img');
-  dImg.alt = '';
-  const dTitle = make('div', 'detail-title');
-  const dName = make('b');
-  const dSub = make('span', 'note');
-  dTitle.append(dName, dSub);
-  dHead.append(dImg, dTitle);
-  const dStats = make('div', 'detail-stats');
-  const dButtons = make('div', 'btn-row');
-  const equipBtn = make('button', 'btn accent', 'Tak');
-  const upBtn = make('button', 'btn');
-  const salvBtn = make('button', 'btn danger');
-  for (const b of [equipBtn, upBtn, salvBtn]) { b.type = 'button'; dButtons.append(b); }
-  const dEmpty = make('p', 'note center');
-  detail.append(dHead, dStats, dButtons, dEmpty);
+  const totals = make('div', 'gs-totals');
 
-  equipBtn.addEventListener('click', () => { if (selected?.uid) h.equipItem(selected.uid); });
-  upBtn.addEventListener('click', () => { if (current) h.upgradeItem(current.uid); });
-  salvBtn.addEventListener('click', () => { if (selected?.uid) { h.salvageItem(selected.uid); selected = null; } });
+  const tools2 = make('div', 'gs-tools');
+  const autoLabel = make('label', 'switch');
+  const autoBox = make('input');
+  autoBox.type = 'checkbox';
+  autoBox.addEventListener('change', () => h.toggleAutoSalvage());
+  autoLabel.append(autoBox, make('span', 'switch-ui'), make('span', null, 'Otomatik parçala'));
+  autoLabel.title = 'Takılı olandan zayıf yeni eşyalar düşer düşmez kristale dönüşür. Kilitli eşyalara dokunulmaz.';
+  const worseBtn = make('button', 'btn small danger');
+  worseBtn.type = 'button';
+  worseBtn.addEventListener('click', () => h.salvageWorse());
+  tools2.append(autoLabel, worseBtn);
 
   const bagHead = make('div', 'gear-head');
   const bagTitle = make('b');
@@ -141,101 +173,174 @@ export function gearView(tools, opts = {}) {
   bagHead.append(bagTitle, wallet);
   const grid = make('div', 'bag-grid');
   const empty = make('p', 'note center', 'Çantan boş. Bosslar ve zindan sandıkları eşya düşürür.');
-  const chestBtn = make('button', 'btn gem big');
+  const bagBox = make('div', 'gs-bag');
+  bagBox.append(grid, empty);
+
+  const chestBtn = make('button', 'btn gem');
   chestBtn.type = 'button';
   const chestImg = make('img');
   chestImg.alt = '';
   chestImg.src = icon('chest');
   chestBtn.append(chestImg, make('span', null, `Sandık Aç · ${EQUIP.chestCost} elmas`));
   chestBtn.addEventListener('click', () => h.openChest());
-  root.append(slotRow, detail, bagHead, grid, empty, chestBtn);
 
-  const bagTiles = new Map();
-  let current = null;
+  // Item card popup.
+  const pop = make('div', 'gs-pop');
+  pop.hidden = true;
+  const card = make('div', 'card gs-card');
+  const cHead = make('div', 'detail-head');
+  const cImg = make('img', 'detail-img');
+  cImg.alt = '';
+  const cTitle = make('div', 'detail-title');
+  const cName = make('b');
+  const cSub = make('span', 'note');
+  cTitle.append(cName, cSub);
+  const cClose = make('button', 'close-btn small', '✕');
+  cClose.type = 'button';
+  cHead.append(cImg, cTitle, cClose);
+  const cStats = make('div', 'gs-stats');
+  const cNote = make('p', 'note center');
+  const cButtons = make('div', 'gs-buttons');
+  const equipBtn = make('button', 'btn accent');
+  const upBtn = make('button', 'btn');
+  const lockBtn = make('button', 'btn');
+  const salvBtn = make('button', 'btn danger');
+  for (const b of [equipBtn, upBtn, lockBtn, salvBtn]) { b.type = 'button'; cButtons.append(b); }
+  card.append(cHead, cStats, cNote, cButtons);
+  pop.append(card);
+
+  panel.append(head, stage, totals, tools2, bagHead, bagBox, chestBtn);
+  screen.append(panel, pop);
+
+  let selected = null;   // { uid } or { slot }
+  let current = null;    // the item on the card
+  let currentWhere = null;
   let lastState = null;
+  const bagTiles = new Map();
 
-  function refresh() { if (lastState) update(lastState); }
+  function select(sel) {
+    selected = sel;
+    pop.hidden = false;
+    if (lastState) update(lastState);
+  }
+  function closePop() { pop.hidden = true; selected = null; }
+  cClose.addEventListener('click', closePop);
+  pop.addEventListener('click', (e) => { if (e.target === pop) closePop(); });
+  close.addEventListener('click', () => api.close());
+  screen.addEventListener('click', (e) => { if (e.target === screen) api.close(); });
 
-  function showDetail(state) {
+  equipBtn.addEventListener('click', () => {
+    if (!current) return;
+    if (currentWhere === 'bag') h.equipItem(current.uid);
+    else h.unequipItem(current.slot);
+    closePop();
+  });
+  upBtn.addEventListener('click', () => { if (current) h.upgradeItem(current.uid); });
+  lockBtn.addEventListener('click', () => { if (current) h.lockItem(current.uid, !current.locked); });
+  salvBtn.addEventListener('click', () => { if (current) { h.salvageItem(current.uid); closePop(); } });
+
+  function showCard(state) {
+    current = null;
+    currentWhere = null;
+    if (pop.hidden || !selected) return;
     const eq = state.equipment;
-    let item = null;
-    let inBag = false;
-    if (selected?.uid) {
+    if (selected.uid) {
       const found = G.findItem(state, selected.uid);
-      if (found) { item = found.item; inBag = found.where === 'bag'; } else selected = null;
+      if (found) { current = found.item; currentWhere = found.where; }
+    } else if (selected.slot) {
+      current = eq.slots[selected.slot];
+      currentWhere = selected.slot;
     }
-    if (!item && selected?.slot) item = eq.slots[selected.slot];
-    current = item;
-    dHead.hidden = dStats.hidden = dButtons.hidden = !item;
-    dEmpty.hidden = !!item;
-    if (!item) {
-      set(dEmpty, selected?.slot ? `${EQUIP_SLOTS.find((s) => s.id === selected.slot).name} yuvası boş. Çantandan bir eşya seç.` : 'Bir eşya seç.');
+    const has = !!current;
+    cHead.hidden = cStats.hidden = cButtons.hidden = !has;
+    cNote.hidden = has;
+    if (!has) {
+      const slot = EQUIP_SLOTS.find((s) => s.id === selected.slot);
+      set(cNote, slot ? `${slot.name} yuvası boş. Çantandan bir ${slot.name.toLocaleLowerCase('tr-TR')} seç.` : 'Bu eşya artık yok.');
       return;
     }
-    dImg.src = icon('item', itemLook(item));
-    set(dName, G.itemName(item));
-    dName.style.color = RARITIES[item.rarity].color;
-    set(dSub, `${RARITIES[item.rarity].name} · Seviye ${item.level}/${EQUIP.maxLevel}${inBag ? '' : ' · Takılı'}`);
-    // Stats, compared with the worn item for bag items.
-    const worn = inBag ? eq.slots[item.slot] : null;
+    const inBag = currentWhere === 'bag';
+    cImg.src = icon('item', itemLook(current));
+    set(cName, G.itemName(current));
+    cName.style.color = RARITIES[current.rarity].color;
+    set(cSub, `${RARITIES[current.rarity].name} · Sv. ${current.level}/${EQUIP.maxLevel}${inBag ? '' : ' · Takılı'}${current.locked ? ' · 🔒' : ''}`);
+    // Compact stat lines; bag items are compared with what's worn.
+    const worn = inBag ? eq.slots[current.slot] : null;
     const wornStats = worn ? Object.fromEntries(G.itemStats(worn).map((x) => [x.k, x.value])) : {};
-    const rows = G.itemStats(item).map(({ k, value }) => {
-      const row = make('div', 'stat-row');
-      const v = make('b', null, formatStat(k, value));
-      if (inBag && worn) {
-        const diff = value - (wornStats[k] || 0);
-        v.classList.add(diff >= 0 ? 'up' : 'down');
+    const lines = G.itemStats(current).map(({ k, value }) => statChip(tools, k, formatStat(k, value), worn ? Math.sign(value - (wornStats[k] || 0)) : 0));
+    if (worn) {
+      for (const { k, value } of G.itemStats(worn)) {
+        if (!current.stats.some((st) => st.k === k)) lines.push(statChip(tools, k, `−${formatStat(k, value).slice(1)}`, -1));
       }
-      row.append(make('span', null, EQUIP_STATS[k].name), v);
-      return row;
-    });
-    if (inBag && worn) {
-      const missing = G.itemStats(worn).filter((x) => !item.stats.some((st) => st.k === x.k));
-      for (const { k, value } of missing) {
-        const row = make('div', 'stat-row');
-        const v = make('b', 'down', `−${formatStat(k, value).slice(1)}`);
-        row.append(make('span', null, EQUIP_STATS[k].name), v);
-        rows.push(row);
-      }
+      lines.sort((a, b) => STAT_ORDER.indexOf(keyOf(a)) - STAT_ORDER.indexOf(keyOf(b)));
     }
-    dStats.replaceChildren(...rows);
-    equipBtn.hidden = !inBag;
-    salvBtn.hidden = !inBag;
-    set(salvBtn, `Parçala +${G.salvageValue(item)}`);
-    const cost = G.upgradeCost(item);
+    cStats.replaceChildren(...lines);
+    set(equipBtn, inBag ? 'Tak' : 'Çıkar');
+    equipBtn.disabled = !inBag && eq.bag.length >= EQUIP.bagSize;
+    const cost = G.upgradeCost(current);
     upBtn.disabled = !(cost <= state.kristal);
-    set(upBtn, cost === Infinity ? 'En yüksek seviye' : `Yükselt · ${fmt(cost)} kristal`);
+    set(upBtn, cost === Infinity ? 'MAKS seviye' : `Yükselt · ${fmt(cost)}`);
+    set(lockBtn, current.locked ? '🔓 Kilidi aç' : '🔒 Kilitle');
+    salvBtn.hidden = !inBag;
+    salvBtn.disabled = !!current.locked;
+    set(salvBtn, current.locked ? 'Kilitli' : `Parçala +${G.salvageValue(current)}`);
   }
+  const keyOf = (chip) => Object.keys(EQUIP_STATS).find((k) => EQUIP_STATS[k].name === chip.title);
 
   function update(state) {
     lastState = state;
     const eq = state.equipment;
-    for (const { slot, t, wrap } of slotTiles) {
-      t.show(eq.slots[slot.id], slot.id);
-      const on = selected && ((selected.slot === slot.id && !selected.uid) || (selected.uid && eq.slots[slot.id]?.uid === selected.uid));
-      wrap.classList.toggle('selected', !!on);
+    const lookKey = `${eq.slots.weapon?.rarity ?? -1}:${eq.slots.helm?.rarity ?? -1}`;
+    if (portrait.dataset.key !== lookKey) {
+      portrait.dataset.key = lookKey;
+      portrait.src = icon('actor:hero', { weapon: eq.slots.weapon?.rarity ?? -1, helm: eq.slots.helm?.rarity ?? -1 }, 132);
     }
-    // Bag tiles: rebuilt only when the bag's contents change.
+    for (const s of EQUIP_SLOTS) slotTiles[s.id].show(eq.slots[s.id], s.id);
+
+    // Totals of everything worn, in display order.
+    const sum = G.gearTotals(state);
+    const totalKey = STAT_ORDER.map((k) => sum[k].toFixed(3)).join();
+    if (totals.dataset.key !== totalKey) {
+      totals.dataset.key = totalKey;
+      const chips = STAT_ORDER.filter((k) => sum[k] > 0).map((k) => statChip(tools, k, formatStat(k, sum[k])));
+      totals.replaceChildren(...(chips.length ? chips : [make('span', 'note', 'Henüz eşya takılı değil.')]));
+    }
+
+    autoBox.checked = !!state.settings.autoSalvage;
+    const worse = G.worseItems(state);
+    worseBtn.disabled = worse.length === 0;
+    set(worseBtn, `Zayıfları parçala (${worse.length})`);
+
     const ids = eq.bag.map((it) => it.uid);
     for (const [uid, t] of bagTiles) if (!ids.includes(uid)) { t.tile.remove(); bagTiles.delete(uid); }
     for (const item of eq.bag) {
       let t = bagTiles.get(item.uid);
       if (!t) {
-        t = itemTile(tools, () => { selected = { uid: item.uid }; refresh(); });
+        t = itemTile(tools, () => select({ uid: item.uid }));
         bagTiles.set(item.uid, t);
         grid.append(t.tile);
       }
-      t.show(item);
-      t.tile.classList.toggle('selected', selected?.uid === item.uid);
-      t.tile.classList.toggle('better', isBetter(state, item));
+      t.show(item, null, compareToWorn(state, item));
+      t.tile.classList.toggle('selected', selected?.uid === item.uid && !pop.hidden);
     }
     empty.hidden = eq.bag.length > 0;
     set(bagTitle, `Çanta ${eq.bag.length}/${EQUIP.bagSize}`);
     set(kText, fmt(state.kristal));
     set(eText, fmt(state.elmas));
     chestBtn.disabled = state.elmas < EQUIP.chestCost;
-    showDetail(state);
+    showCard(state);
   }
 
-  return { root, update };
+  const api = {
+    open(slotId) {
+      screen.hidden = false;
+      if (slotId) select({ slot: slotId });
+      else closePop();
+      if (lastState) update(lastState);
+    },
+    close() { screen.hidden = true; closePop(); },
+    get isOpen() { return !screen.hidden; },
+    update(state) { lastState = state; if (!screen.hidden) update(state); },
+  };
+  return api;
 }

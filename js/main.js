@@ -41,7 +41,8 @@ function dispatch(events) {
     }
     if (ev.type === 'item') {
       const r = RARITIES[ev.item.rarity];
-      ui.toast(ev.salvaged ? `Çanta dolu: ${G.itemName(ev.item)} → +${ev.salvaged} kristal` : `Yeni eşya: ${G.itemName(ev.item)} (${r.name})`);
+      ui.toast(ev.auto ? `Zayıf eşya parçalandı: ${G.itemName(ev.item)} → +${ev.salvaged} kristal`
+        : ev.salvaged ? `Çanta dolu: ${G.itemName(ev.item)} → +${ev.salvaged} kristal` : `Yeni eşya: ${G.itemName(ev.item)} (${r.name})`);
       if (!ev.salvaged) sfx.item(ev.item.rarity);
     }
     renderer.handle(ev, state);
@@ -185,6 +186,21 @@ const ui = createUI({
   },
   equipItem(uid) {
     if (G.equip(state, uid)) { sfx.buy(); ui.refresh(); }
+  },
+  unequipItem(slot) {
+    if (G.unequip(state, slot)) { sfx.buy(); ui.refresh(); }
+  },
+  lockItem(uid, locked) {
+    if (G.setLock(state, uid, locked)) { sfx.buy(); ui.toast(locked ? 'Kilitlendi: parçalanmaz' : 'Kilit açıldı'); ui.refresh(); }
+  },
+  salvageWorse() {
+    const { count, kristal } = G.salvageWorse(state);
+    if (count) { sfx.coin(); ui.toast(`${count} zayıf eşya parçalandı: +${kristal} kristal`); store.save(state); ui.refresh(); }
+  },
+  toggleAutoSalvage() {
+    state.settings.autoSalvage = !state.settings.autoSalvage;
+    ui.toast(state.settings.autoSalvage ? 'Otomatik parçalama açık: zayıf yeni eşyalar kristale döner' : 'Otomatik parçalama kapalı');
+    ui.refresh();
   },
   upgradeItem(uid) {
     if (G.upgradeItem(state, uid)) { sfx.buy(); ui.refresh(); }
@@ -439,6 +455,16 @@ document.addEventListener('keydown', (e) => {
     if (def) activateSkill(def.id);
   }
 });
+
+// No pinch zoom: this is a game screen, not a page. The viewport meta and `touch-action:
+// pan-x pan-y` (which also rules out double-tap zoom) cover most browsers; iOS Safari ignores
+// the meta's scale lock, so its pinch gestures are stopped here. Double taps are left alone:
+// blocking touchend would also eat quick repeated taps on the shop buttons.
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+}
+document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+document.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
 
 // Any first touch unlocks audio (browsers block it before a gesture).
 document.addEventListener('pointerdown', unlockAudio, { once: true });

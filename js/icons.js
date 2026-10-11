@@ -219,6 +219,30 @@ ICONS.chest = (g) => {
   flat(g, circle(32, 35, 1.8), INK);
 };
 
+// ---- Small stat symbols ----
+
+ICONS.crownIcon = (g) => {
+  glow(g, 32, 34, 26, '#ffd060', 0.35);
+  blob(g, poly([[8, 48], [6, 18], [20, 32], [32, 12], [44, 32], [58, 18], [56, 48]]), GOLD, { depth: 3.4, light: '#fff2a8' });
+  blob(g, roundRect(6, 44, 52, 10, 3), '#d8961e', { depth: 1.4 });
+  flat(g, circle(32, 34, 4), '#e0413b');
+  flat(g, circle(19, 38, 3), '#4aa8f0');
+  flat(g, circle(45, 38, 3), '#4aa8f0');
+};
+
+ICONS.stunIcon = (g) => {
+  line(g, ellipse(32, 36, 24, 9), '#c8a84a', 3, 0.8);
+  for (const [x, y, r] of [[12, 34, 9], [32, 46, 10], [52, 32, 9], [33, 22, 7]]) blob(g, star(x, y, r, r * 0.45, 5), '#ffe07a', { ow: 1.8, depth: 1.2, light: '#ffffff' });
+};
+
+ICONS.comboIcon = (g) => {
+  blob(g, roundRect(14, 6, 36, 7, 3), '#8a5a32', { depth: 1 });
+  blob(g, roundRect(14, 51, 36, 7, 3), '#8a5a32', { depth: 1 });
+  blob(g, (c) => { c.moveTo(18, 13); c.lineTo(46, 13); c.quadraticCurveTo(46, 26, 34, 32); c.quadraticCurveTo(46, 38, 46, 51); c.lineTo(18, 51); c.quadraticCurveTo(18, 38, 30, 32); c.quadraticCurveTo(18, 26, 18, 13); c.closePath(); }, '#d8f4ff', { depth: 2, light: '#ffffff' });
+  flat(g, (c) => { c.moveTo(24, 20); c.lineTo(40, 20); c.quadraticCurveTo(36, 27, 32, 29); c.quadraticCurveTo(28, 27, 24, 20); c.closePath(); }, GOLD);
+  flat(g, (c) => { c.moveTo(21, 49); c.quadraticCurveTo(32, 38, 43, 49); c.closePath(); }, GOLD);
+};
+
 // ---- Top-right menu ----
 
 ICONS.menuList = (g) => {
