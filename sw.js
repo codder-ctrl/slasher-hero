@@ -32,6 +32,8 @@ const SHELL = [
   'js/ui.js',
   'js/ui-dungeon.js',
   'js/ui-pets.js',
+  'js/ui-windows.js',
+  'js/news.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',

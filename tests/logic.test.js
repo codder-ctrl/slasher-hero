@@ -4,7 +4,7 @@ import * as L from '../js/logic.js';
 import {
   UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, PET_TRAINING, EGG_COST, MAX_STARS, DUPLICATE_KRISTAL,
   BOSS_ELMAS, STARTING_ELMAS, FORM_MULT, KILLS_PER_STAGE, BOSS_TIME, BOSS_HP_MULT, RESPAWN_DELAY,
-  PRESTIGE_MIN_STAGE, OFFLINE_MIN, OFFLINE_CAP, MAX_CRIT_CHANCE, MAX_SKILL_CRIT_CHANCE,
+  PRESTIGE_MIN_STAGE, OFFLINE_MIN, OFFLINE_CAP, MAX_CRIT_CHANCE, MAX_SKILL_CRIT_CHANCE, DAILY,
 } from '../js/config.js';
 
 const noCrit = () => 0.99;   // rng that never crits and always picks enemy kind 2
@@ -305,7 +305,7 @@ test('Altın Yağmuru pays gold at once', () => {
   assert.equal(s.gold, expected);
 });
 
-test('skill timers survive saves and rebirth, expire offline, and bad timers are clamped', () => {
+test('skill timers survive saves, expire offline, reset on rebirth, and bad timers are clamped', () => {
   const s = withSkills(3);
   L.useSkill(s, 'rage');
   const round = L.loadState(JSON.parse(JSON.stringify(L.serializeState(s))), noCrit);
@@ -316,10 +316,12 @@ test('skill timers survive saves and rebirth, expire offline, and bad timers are
   L.applyOffline(s, 3600);
   assert.deepEqual(s.skillTimers.rage, { active: 0, cooldown: 0 });
 
+  // Rebirth resets skill levels and their cooldowns with the rest of the run.
   L.useSkill(s, 'rage');
+  s.maxStage = 40;
   L.prestige(s, noCrit);
   assert.equal(s.skills.rage, 0);
-  assert.ok(s.skillTimers.rage.cooldown > 0);
+  assert.deepEqual(s.skillTimers.rage, { active: 0, cooldown: 0 });
 
   const bad = L.loadState({ skills: { rage: 99 }, skillTimers: { rage: { active: 1e9, cooldown: -4 } } }, noCrit);
   const rage = SKILLS.find((k) => k.id === 'rage');
@@ -345,4 +347,81 @@ test('formatDuration', () => {
   assert.equal(L.formatDuration(5), '5 sn');
   assert.equal(L.formatDuration(125), '2 dk 5 sn');
   assert.equal(L.formatDuration(7260), '2 sa 1 dk');
+});
+
+// ---- Daily login ----
+
+const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
+
+test('daily rewards: one claim a day, the streak grows on consecutive days and resets after a gap', () => {
+  const s = fresh();
+  assert.deepEqual(L.dailyStatus(s, at(2026, 10, 1)), { canClaim: true, claimedToday: false, streak: 1, index: 0 });
+  const first = L.claimDaily(s, at(2026, 10, 1, 9));
+  assert.equal(first.day, 1);
+  assert.equal(s.gold, first.gold);
+  assert.equal(L.claimDaily(s, at(2026, 10, 1, 23)), null, 'same day');
+  assert.equal(L.claimDaily(s, at(2026, 10, 2, 0)).day, 2, 'right after midnight counts as the next day');
+  for (let d = 3; d <= 7; d++) L.claimDaily(s, at(2026, 10, d));
+  assert.equal(s.daily.streak, 7);
+  assert.equal(s.elmas, DAILY.elmas[6]);
+  assert.equal(L.claimDaily(s, at(2026, 10, 8)).day, 1, 'the cycle starts over after day 7');
+  assert.equal(s.daily.streak, 8);
+  assert.equal(L.claimDaily(s, at(2026, 10, 10)).day, 1, 'a missed day resets the streak');
+  assert.equal(s.daily.streak, 1);
+  // Across a month boundary.
+  s.daily = { last: '2026-10-31', streak: 2 };
+  assert.equal(L.claimDaily(s, at(2026, 11, 1)).day, 3);
+});
+
+test('daily gold grows with progress and day 7 pays the most', () => {
+  const s = fresh();
+  const early = L.dailyRewards(s);
+  s.maxStage = 40;
+  const late = L.dailyRewards(s);
+  assert.ok(late[0].gold > early[0].gold * 1000);
+  for (let i = 1; i < 7; i++) assert.ok(late[i].gold > late[i - 1].gold);
+  assert.ok(late[6].elmas > 0);
+  // A boss frontier pays like the stage before it, not the boss.
+  s.maxStage = 41;
+  const before = L.dailyRewards(s)[0].gold;
+  s.maxStage = 45;
+  assert.ok(L.dailyRewards(s)[0].gold < before * 10);
+});
+
+test('daily and mail progress survive saves and rebirth; bad values are repaired', () => {
+  const s = fresh();
+  L.claimDaily(s, at(2026, 10, 1));
+  L.claimMail(s, 'welcome');
+  s.maxStage = 40;
+  L.prestige(s, noCrit);
+  assert.equal(s.daily.last, '2026-10-01');
+  assert.ok(s.mail.claimed.includes('welcome'));
+  const round = L.loadState(JSON.parse(JSON.stringify(L.serializeState(s))), noCrit);
+  assert.deepEqual(round.daily, { last: '2026-10-01', streak: 1 });
+  assert.deepEqual(round.mail.claimed, ['welcome']);
+  const bad = L.loadState({ v: 2, daily: { last: 'yesterday', streak: 99 }, mail: { claimed: ['welcome', 'nope', 'welcome'], read: 5 }, seen: { version: 3 } }, noCrit);
+  assert.deepEqual(bad.daily, { last: '', streak: 0 });
+  assert.deepEqual(bad.mail, { claimed: ['welcome'], read: [] });
+  assert.equal(bad.seen.version, '');
+});
+
+// ---- Mail ----
+
+test('new players start without elmas and collect 100 from the welcome mail once', () => {
+  const s = fresh();
+  assert.equal(s.elmas, 0);
+  assert.equal(L.unreadMail(s), 1);
+  assert.deepEqual(L.claimMail(s, 'welcome'), { elmas: 100 });
+  assert.equal(s.elmas, 100);
+  assert.equal(L.claimMail(s, 'welcome'), null);
+  assert.equal(s.elmas, 100);
+  assert.equal(L.unreadMail(s), 0);
+  assert.equal(L.claimMail(s, 'nope'), null);
+});
+
+test('v1 saves already had their starting elmas, so the welcome gift counts as collected', () => {
+  const old = L.loadState({ game: 'slasher-hero', v: 1, elmas: 100 }, noCrit);
+  assert.equal(old.elmas, 100);
+  assert.equal(L.claimMail(old, 'welcome'), null);
+  assert.equal(L.unreadMail(old), 0);
 });

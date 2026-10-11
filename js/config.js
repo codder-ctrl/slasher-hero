@@ -1,7 +1,7 @@
 // Game constants and content tables. Pure data with no DOM access, so tests can import it.
 
 export const STORAGE_KEY = 'slasher-hero-v1';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;           // 2: the 100 starting elmas moved into the welcome mail
 // Every save and save code carries this tag; codes without it (e.g. from Piksel Savaşçı) are refused.
 export const GAME_ID = 'slasher-hero';
 
@@ -53,7 +53,7 @@ export const UPGRADES = [
 // `cooldown` starts when the skill is used, so it includes `duration`.
 export const SKILLS = [
   { id: 'rage',     name: 'Öfke',            icon: 'skRage',  unlockStage: 5,  baseCost: 300,   growth: 4, max: 10, duration: 30, cooldown: 300, color: '#ef7d57' },
-  { id: 'warcry',   name: 'Savaş Narası',    icon: 'skHorn',  unlockStage: 12, baseCost: 3000,  growth: 4, max: 10, duration: 30, cooldown: 300, color: '#ffcd75' },
+  { id: 'warcry',   name: 'Savaş Narası',    icon: 'skTreat',  unlockStage: 12, baseCost: 3000,  growth: 4, max: 10, duration: 30, cooldown: 300, color: '#ffcd75' },
   { id: 'storm',    name: 'Kılıç Fırtınası', icon: 'skStorm', unlockStage: 20, baseCost: 4e4,   growth: 4, max: 10, duration: 20, cooldown: 600, color: '#73eff7' },
   { id: 'focus',    name: 'Keskin Bakış',    icon: 'skEye',   unlockStage: 30, baseCost: 8e5,   growth: 4, max: 10, duration: 30, cooldown: 480, color: '#41a6f6' },
   { id: 'goldRain', name: 'Altın Yağmuru',   icon: 'skCoins', unlockStage: 40, baseCost: 2e7,   growth: 4, max: 10, duration: 0,  cooldown: 900, color: '#ffcd75' },
@@ -69,7 +69,7 @@ export const PET_BASE_DPS = 5;
 export const PET_DPS_GROWTH = 1.045;  // per training level; under the 1.07 cost growth, so runs hit a wall (~stage 80 with the starter dog)
 
 export const EGG_COST = 100;          // elmas per random pet
-export const STARTING_ELMAS = 100;
+export const STARTING_ELMAS = 0;      // new players get their first 100 from the welcome mail
 export const BOSS_ELMAS = 10;         // first time each main-battle boss stage is beaten (all-time)
 export const STARTER_PET = 'dog';
 export const FORM_MULT = [1, 2.5, 6];
@@ -135,6 +135,31 @@ export const PETS = [
       { name: 'Anka Kuşu',    colors: { body: '#e0423a', belly: '#ffc84a', dark: '#9a2236', accent: '#ffe07a', glow: '#ff8a3a' } },
       { name: 'Ebedi Anka',   colors: { body: '#4aa8f0', belly: '#e6f8ff', dark: '#2a5fc0', accent: '#bff6ff', glow: '#7ff4ff' } },
     ],
+  },
+];
+
+// ---- Daily login ----
+// One claim per local calendar day. Claiming on consecutive days walks through the 7-day cycle;
+// missing a day starts it over. Gold is worth `gold[i]` enemies of the stage the player farms,
+// so the reward keeps up with progress (and shrinks again after a rebirth).
+export const DAILY = {
+  gold: [20, 30, 45, 60, 80, 100, 150],
+  elmas: [0, 0, 0, 0, 0, 0, 20],
+};
+
+// ---- Mail ----
+// Every player sees every mail; rewards can be collected once. `welcome` is the starter gift.
+export const MAIL = [
+  {
+    id: 'welcome',
+    from: 'Slasher Hero Ekibi',
+    title: 'Hoş geldin, kahraman!',
+    body: [
+      'Çayırları balçıklar sardı, bu topraklar senin kılıcını bekliyordu.',
+      'Yolculuğuna küçük bir hediye: 100 elmas. Pet sekmesinden bir yumurta açıp yeni bir dost bulabilirsin.',
+      'İyi savaşlar!',
+    ],
+    reward: { elmas: 100 },
   },
 ];
 

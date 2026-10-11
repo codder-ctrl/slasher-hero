@@ -327,9 +327,7 @@ export function createRenderer(canvas) {
     } else if (ev.type === 'kill') {
       queue(0, () => kill(ev));
     } else if (ev.type === 'skill' && ev.id === 'goldRain') {
-      for (let i = 0; i < 34; i++) {
-        coins.push({ x: 10 + Math.random() * (W - 20), y: -10 - Math.random() * 120, vx: Math.random() * 30 - 15, vy: Math.random() * 60, t: 0, drop: 1 + Math.random() * 0.5, spin: Math.random() * 6 });
-      }
+      api.coinShower(34);
     } else if (ev.type === 'skill') {
       if (ev.id === 'rage') fx.ring(heroX(), gy - 46, 10, 80, '#ff6a2a', 0.5, 4);
       if (ev.id === 'storm') { for (let i = 0; i < 6; i++) fx.slash(heroX() + 20, gy - 50, 60, (i / 6) * Math.PI, '#a8f4ff', 0.35, 6); }
@@ -472,7 +470,7 @@ export function createRenderer(canvas) {
     updateCoins(dt);
   }
 
-  return {
+  const api = {
     resize,
     frame,
     handle,
@@ -482,9 +480,16 @@ export function createRenderer(canvas) {
       fx.ring(p.x, p.y, 4, 22, '#ffffff', 0.25, 2.2);
       for (let i = 0; i < 3; i++) fx.particle({ x: p.x, y: p.y, vx: Math.random() * 120 - 60, vy: -Math.random() * 90, g: 200, life: 0.3, size: 2, kind: 'star', color: '#fff6c0' });
     },
+    // Coins rain from the top and fly to the gold counter (daily reward, Altın Yağmuru).
+    coinShower(n = 34) {
+      for (let i = 0; i < n; i++) {
+        coins.push({ x: 10 + Math.random() * (W - 20), y: -10 - Math.random() * 120, vx: Math.random() * 30 - 15, vy: Math.random() * 60, t: 0, drop: 1 + Math.random() * 0.5, spin: Math.random() * 6 });
+      }
+    },
     showBanner(textStr, color = '#c8353a', life = 1.6) { fx.banner(textStr, mix(color, '#3b1d3f', 0.22), life); },
     setCoinTarget(cssX, cssY) { coinTargetCss = { x: cssX, y: cssY }; },
     onCoinArrive(cb) { onCoin = cb; },
     onPetShot(cb) { onPetShot = cb; },
   };
+  return api;
 }

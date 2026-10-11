@@ -5,7 +5,7 @@ import {
   MILESTONE_MULT, PRESTIGE_MIN_STAGE, SOUL_BONUS, OFFLINE_MIN, OFFLINE_CAP, OFFLINE_RATE,
   BUY_AMOUNTS, UPGRADES, SKILLS, ZONES, MAX_SKILL_CRIT_CHANCE, PET_TRAINING, PET_BASE_DPS,
   PET_DPS_GROWTH, EGG_COST, STARTING_ELMAS, BOSS_ELMAS, STARTER_PET, FORM_MULT, STAR_BONUS, MAX_STARS,
-  DUPLICATE_KRISTAL, RARITIES, PETS, COMPANIONS, STARTER_TEAM, TEAM_SIZE,
+  DUPLICATE_KRISTAL, RARITIES, PETS, COMPANIONS, STARTER_TEAM, TEAM_SIZE, DAILY, MAIL,
 } from './config.js';
 import { tickDungeon } from './dungeon.js';
 
@@ -38,6 +38,9 @@ export function newGame(rng = Math.random, now = Date.now()) {
     stormAcc: 0,       // fractional auto-taps carried between ticks
     stats: { taps: 0, crits: 0, kills: 0, bossKills: 0, skillsUsed: 0, eggs: 0, totalGold: 0, prestiges: 0, playTime: 0, bestStage: 1 },
     settings: { sound: true, music: true, buyAmount: 1 },
+    daily: { last: '', streak: 0 },  // last claim as a local YYYY-MM-DD and the streak it made
+    mail: { claimed: [], read: [] },
+    seen: { version: '', news: [] }, // what the player has opened in the blog (for the badge)
     enemy: null,
     lastSeen: now,
   };
@@ -388,7 +391,8 @@ export function prestigeSouls(state) {
   return Math.floor((state.maxStage - 15) ** 1.5 / 5);
 }
 
-// Resets the run for souls. Keeps souls, stats, settings and skill timers (so rebirth can't
+// Resets the run for souls. Keeps souls, stats, settings and everything permanent; skill
+// levels and cooldowns reset with the run.
 // skip a cooldown); skill levels reset like other upgrades. Returns the souls gained.
 export function prestige(state, rng = Math.random) {
   const gain = prestigeSouls(state);
@@ -398,9 +402,85 @@ export function prestige(state, rng = Math.random) {
   fresh.stats = { ...state.stats, prestiges: state.stats.prestiges + 1 };
   fresh.settings = state.settings;
   // Pets, gems, companions and the dungeon are permanent.
-  for (const k of ['skillTimers', 'pets', 'activePet', 'elmas', 'kristal', 'companions', 'dungeon', 'dungeonRun']) fresh[k] = state[k];
+  for (const k of ['pets', 'activePet', 'elmas', 'kristal', 'companions', 'dungeon', 'dungeonRun', 'daily', 'mail', 'seen']) fresh[k] = state[k];
   Object.assign(state, fresh);
   return gain;
+}
+
+// ---- Daily login ----
+
+// Local calendar day of a timestamp as YYYY-MM-DD.
+export function dayKey(time) {
+  const d = new Date(time);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const previousDay = (time) => {
+  const d = new Date(time);
+  d.setDate(d.getDate() - 1);
+  return dayKey(d.getTime());
+};
+
+// The stage whose enemies set gold rewards: the frontier, or the one before it if it's a boss.
+const farmStage = (state) => (isBossStage(state.maxStage) ? state.maxStage - 1 : state.maxStage) || 1;
+
+// The 7 rewards of the cycle at the player's current progress.
+export function dailyRewards(state) {
+  const unit = enemyGold(state, farmStage(state));
+  return DAILY.gold.map((g, i) => ({ gold: Math.ceil(unit * g), elmas: DAILY.elmas[i] }));
+}
+
+// { canClaim, index (0..6, the cycle slot the next claim fills or the last claim filled),
+//   streak (what the streak is / would be after claiming), claimedToday }.
+export function dailyStatus(state, now = Date.now()) {
+  const today = dayKey(now);
+  const { last, streak } = state.daily;
+  if (last === today) return { canClaim: false, claimedToday: true, streak, index: (streak - 1) % DAILY.gold.length };
+  const next = last === previousDay(now) ? streak + 1 : 1;
+  return { canClaim: true, claimedToday: false, streak: next, index: (next - 1) % DAILY.gold.length };
+}
+
+// Claims today's reward. Returns { gold, elmas, day } or null when already claimed today.
+export function claimDaily(state, now = Date.now(), events = []) {
+  const status = dailyStatus(state, now);
+  if (!status.canClaim) return null;
+  const reward = dailyRewards(state)[status.index];
+  addGold(state, reward.gold);
+  state.elmas += reward.elmas;
+  state.daily = { last: dayKey(now), streak: status.streak };
+  const result = { type: 'daily', ...reward, day: status.index + 1 };
+  events.push(result);
+  return result;
+}
+
+// ---- Mail ----
+
+export const findMail = (id) => MAIL.find((m) => m.id === id);
+export const mailClaimed = (state, id) => state.mail.claimed.includes(id);
+
+// Mails still worth a look: unread, or with a reward left to collect.
+export function unreadMail(state) {
+  return MAIL.filter((m) => !state.mail.read.includes(m.id) || (m.reward && !mailClaimed(state, m.id))).length;
+}
+
+export function readMail(state, id) {
+  if (!findMail(id) || state.mail.read.includes(id)) return false;
+  state.mail.read.push(id);
+  return true;
+}
+
+// Collects a mail's reward once. Returns the reward or null.
+export function claimMail(state, id, events = []) {
+  const mail = findMail(id);
+  if (!mail?.reward || mailClaimed(state, id)) return null;
+  const { elmas = 0, gold = 0, kristal = 0 } = mail.reward;
+  state.elmas += elmas;
+  state.kristal += kristal;
+  if (gold) addGold(state, gold);
+  state.mail.claimed.push(id);
+  readMail(state, id);
+  events.push({ type: 'mail', id, elmas, gold, kristal });
+  return mail.reward;
 }
 
 // ---- Offline progress ----
@@ -484,6 +564,20 @@ export function loadState(raw, rng = Math.random, now = Date.now()) {
   if (typeof raw.settings?.sound === 'boolean') s.settings.sound = raw.settings.sound;
   if (typeof raw.settings?.music === 'boolean') s.settings.music = raw.settings.music;
   if (BUY_AMOUNTS.includes(raw.settings?.buyAmount)) s.settings.buyAmount = raw.settings.buyAmount;
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  if (day.test(raw.daily?.last)) s.daily.last = raw.daily.last;
+  s.daily.streak = s.daily.last ? Math.max(1, int(raw.daily?.streak, 1)) : 0;
+  const ids = (list, known) => (Array.isArray(list) ? [...new Set(list)].filter((id) => known.includes(id)) : []);
+  const mailIds = MAIL.map((m) => m.id);
+  s.mail.claimed = ids(raw.mail?.claimed, mailIds);
+  s.mail.read = ids(raw.mail?.read, mailIds);
+  // v1 saves started with 100 elmas, which is what the welcome mail now gives.
+  if (raw.v === 1 && !s.mail.claimed.includes('welcome')) {
+    s.mail.claimed.push('welcome');
+    s.mail.read.push('welcome');
+  }
+  if (typeof raw.seen?.version === 'string') s.seen.version = raw.seen.version.slice(0, 20);
+  if (Array.isArray(raw.seen?.news)) s.seen.news = raw.seen.news.filter((x) => typeof x === 'string').slice(0, 200);
   s.lastSeen = num(raw.lastSeen, now);
   spawnEnemy(s, rng);
   return s;

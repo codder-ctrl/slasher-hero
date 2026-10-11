@@ -2,7 +2,8 @@ import {
   INK, at, blob, line, flat, glow, ellipse, circle, roundRect, smooth, poly, capsule, star, darker, lighter,
 } from './paint.js';
 import { ACTORS } from './actors.js';
-import { PETS, COMPANIONS } from './config.js';
+import { PETS, COMPANIONS, ZONES } from './config.js';
+import { paintBackdrop } from './scenery.js';
 
 // UI icons in the same vector style, drawn into a 64-unit square. `ICONS` holds the plain
 // icons; names starting with "actor:" are portraits of an actor in its resting pose.
@@ -98,11 +99,16 @@ export const ICONS = {
     blob(g, poly([[20, 36], [29, 39], [28, 44], [21, 42]]), '#fff2a0', { ow: 1.6, depth: 0.6 });
     blob(g, poly([[44, 36], [35, 39], [36, 44], [43, 42]]), '#fff2a0', { ow: 1.6, depth: 0.6 });
   },
-  skHorn(g) {
-    blob(g, (c) => { c.moveTo(10, 40); c.quadraticCurveTo(26, 40, 44, 14); c.lineTo(54, 20); c.quadraticCurveTo(40, 52, 12, 50); c.closePath(); }, '#f4e2b4', { depth: 3, light: '#ffffff' });
-    blob(g, ellipse(49, 17, 5.4, 7.6, 0.6), '#7a4a2c', { depth: 1.6 });
-    line(g, (c) => { c.moveTo(22, 42); c.quadraticCurveTo(24, 47, 22, 50); c.moveTo(32, 36); c.quadraticCurveTo(36, 42, 33, 48); }, GOLD, 3);
-    line(g, (c) => { for (let i = 0; i < 3; i++) { c.moveTo(54 - i * 2, 4 + i * 2); c.lineTo(58 - i * 2, 0 + i * 2); } }, '#ffd060', 2.4);
+  // Savaş Narası boosts the pet: a full food bowl with a bone on top.
+  skTreat(g) {
+    glow(g, 32, 34, 30, '#ffd060', 0.45);
+    blob(g, capsule(14, 22, 48, 14, 4.6), '#f6ecd6', { depth: 1.6, light: '#ffffff' });
+    for (const [x, y] of [[13, 19], [14, 26], [48, 10], [50, 17]]) blob(g, circle(x, y, 5.2), '#f6ecd6', { depth: 1.4, light: '#ffffff' });
+    blob(g, smooth([[10, 34], [54, 34], [50, 50], [44, 55], [20, 55], [14, 50]], 0.7), '#d8443e', { depth: 3 });
+    blob(g, ellipse(32, 34, 22, 6), '#8a5a32', { depth: 1.6, ow: 2, light: '#c08a50' });
+    for (const [x, y] of [[24, 33], [31, 31], [38, 33], [44, 32], [20, 35]]) flat(g, circle(x, y, 2.6), '#b8844a');
+    line(g, (c) => { c.moveTo(16, 44); c.quadraticCurveTo(32, 48, 48, 44); }, '#f6c03a', 2.4);
+    flat(g, star(52, 8, 5, 1.4, 4), '#ffffff');
   },
   skStorm(g) {
     glow(g, 32, 32, 30, '#7ff4ff', 0.45);
@@ -138,6 +144,52 @@ function portrait(g, id, look) {
   at(g, 32, def.hover ? 40 : 60, 0, () => def.draw(g, P, look, null), s);
 }
 
+// ---- Top-right menu ----
+
+ICONS.menuList = (g) => {
+  for (let i = 0; i < 3; i++) {
+    const y = 18 + i * 14;
+    blob(g, circle(15, y, 5), '#fff8e6', { ow: 2.4, depth: 1.2 });
+    blob(g, roundRect(25, y - 4.5, 28, 9, 4.5), '#fff8e6', { ow: 2.4, depth: 1.4 });
+  }
+};
+
+ICONS.daily = (g) => {
+  glow(g, 32, 36, 30, '#ffd060', 0.4);
+  blob(g, roundRect(10, 28, 44, 28, 4), '#d8443e', { depth: 3 });
+  blob(g, roundRect(7, 20, 50, 11, 4), '#e8584a', { depth: 2 });
+  blob(g, roundRect(28, 20, 8, 36, 2), GOLD, { depth: 1.4, ow: 2 });
+  blob(g, (c) => { c.moveTo(32, 20); c.bezierCurveTo(22, 4, 10, 12, 18, 20); c.closePath(); }, GOLD, { depth: 1.2, ow: 2 });
+  blob(g, (c) => { c.moveTo(32, 20); c.bezierCurveTo(42, 4, 54, 12, 46, 20); c.closePath(); }, GOLD, { depth: 1.2, ow: 2 });
+  flat(g, star(52, 12, 5, 1.4, 4), '#ffffff');
+};
+
+ICONS.mail = (g) => {
+  blob(g, roundRect(7, 16, 50, 34, 5), '#f6ecd6', { depth: 3, light: '#ffffff' });
+  line(g, (c) => { c.moveTo(9, 18); c.lineTo(32, 36); c.lineTo(55, 18); }, '#b89a6a', 2.4);
+  line(g, (c) => { c.moveTo(9, 48); c.lineTo(26, 32); c.moveTo(55, 48); c.lineTo(38, 32); }, '#d8c49a', 1.8);
+  blob(g, circle(32, 35, 6), '#c8353a', { depth: 1.4, ow: 1.8 });
+  flat(g, star(32, 35, 3, 1.3, 5), '#f6c03a');
+};
+
+ICONS.trophy = (g) => {
+  glow(g, 32, 26, 28, '#ffd060', 0.4);
+  line(g, (c) => { c.arc(14, 22, 8, Math.PI * 0.5, Math.PI * 1.5); c.moveTo(50, 14); c.arc(50, 22, 8, -Math.PI * 0.5, Math.PI * 0.5); }, INK, 7);
+  line(g, (c) => { c.arc(14, 22, 8, Math.PI * 0.5, Math.PI * 1.5); c.moveTo(50, 14); c.arc(50, 22, 8, -Math.PI * 0.5, Math.PI * 0.5); }, GOLD, 3.4);
+  blob(g, (c) => { c.moveTo(16, 10); c.lineTo(48, 10); c.quadraticCurveTo(48, 38, 32, 40); c.quadraticCurveTo(16, 38, 16, 10); c.closePath(); }, GOLD, { depth: 3.4, light: '#fff2a8' });
+  blob(g, roundRect(28, 38, 8, 8, 2), '#c8871a', { depth: 1, ow: 2 });
+  blob(g, roundRect(18, 46, 28, 10, 3), '#7a4a2c', { depth: 1.6 });
+  flat(g, star(32, 23, 7, 3, 5), '#fff2a8');
+};
+
+ICONS.scroll = (g) => {
+  blob(g, roundRect(14, 12, 36, 42, 3), '#f6e7c1', { depth: 3, light: '#ffffff' });
+  line(g, (c) => { for (let i = 0; i < 4; i++) { c.moveTo(20, 22 + i * 7); c.lineTo(i === 3 ? 34 : 44, 22 + i * 7); } }, '#a88a5a', 2);
+  blob(g, roundRect(9, 6, 46, 9, 4.5), '#e2c98e', { depth: 1.6 });
+  blob(g, roundRect(9, 51, 46, 9, 4.5), '#e2c98e', { depth: 1.6 });
+  blob(g, circle(44, 50, 6), '#c8353a', { depth: 1.2, ow: 1.8 });
+};
+
 // Tab icons: portraits of the hero, the starter dog and the guard.
 ICONS.tabHero = (g) => portrait(g, 'hero', {});
 ICONS.tabPet = (g) => portrait(g, 'dog', { colors: PETS[0].forms[0].colors, form: 1 });
@@ -147,6 +199,39 @@ ICONS.tabDungeon = (g) => {
 };
 
 const urls = new Map();
+
+// A wide cover picture for blog posts: 'scene:<theme>[:<enemy actor>]' paints a zone with the
+// hero facing an enemy. Image files are used as they are.
+export function coverUrl(spec, width = 360, height = 160) {
+  if (!spec.startsWith('scene:')) return spec;
+  const key = `cover:${spec}:${width}x${height}`;
+  let url = urls.get(key);
+  if (url) return url;
+  const [, theme, enemy] = spec.split(':');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const c = document.createElement('canvas');
+  c.width = Math.round(width * dpr);
+  c.height = Math.round(height * dpr);
+  const g = c.getContext('2d');
+  const H = 170;
+  const k = c.height / H;
+  const W = c.width / k;
+  g.scale(k, k);
+  const gy = 150;
+  paintBackdrop(g, theme, W, H, gy, 5);
+  const hero = ACTORS.hero;
+  at(g, W * 0.36, gy, 0, () => hero.draw(g, { ...hero.rest, armF: -1.7, elbowF: -0.5, sword: 1.1, mouth: 0.8, cape: 1 }, {}, null), 1);
+  const def = ACTORS[enemy];
+  if (def) {
+    const spec2 = ZONES.flatMap((z) => z.enemies).find((e) => e.actor === enemy);
+    const look = { colors: spec2.colors, boss: true };
+    const P = { ...def.rest, ...def.idle(0.3, look), blink: 0 };
+    at(g, W * 0.72, gy, 0, () => def.draw(g, P, look, null), -1.25, 1.25);
+  }
+  url = c.toDataURL('image/jpeg', 0.88);
+  urls.set(key, url);
+  return url;
+}
 
 export function iconUrl(name, look = null, size = 48) {
   const dpr = Math.min(3, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);

@@ -4,9 +4,10 @@ import {
 } from './config.js';
 import * as L from './logic.js';
 import { iconUrl } from './icons.js';
-import { CHANGELOG, VERSION } from './changelog.js';
+import { VERSION } from './changelog.js';
 import { createPetPage } from './ui-pets.js';
 import { createDungeonPage } from './ui-dungeon.js';
+import { createWindows } from './ui-windows.js';
 
 // DOM side of the game: HUD over the battle, the tabbed panel below it and modals.
 // It never changes game state itself; every action goes through the handlers from main.js.
@@ -95,9 +96,9 @@ function skillTiming(def) {
 
 export function createUI(h) {
   const icons = {};
-  const icon = (name, look) => {
-    const key = name + (look ? JSON.stringify(look) : '');
-    return (icons[key] ||= iconUrl(name, look));
+  const icon = (name, look, size) => {
+    const key = name + (look ? JSON.stringify(look) : '') + (size || '');
+    return (icons[key] ||= iconUrl(name, look, size));
   };
   document.querySelectorAll('img[data-icon]').forEach((img) => { img.src = icon(img.dataset.icon); });
 
@@ -179,6 +180,7 @@ export function createUI(h) {
   const pageTools = { h, icon, make, set, makeCard, fmt };
   const petPage = createPetPage(pageTools);
   const dungeonPage = createDungeonPage(pageTools);
+  const windows = createWindows(pageTools);
 
   const skillCards = SKILLS.map((def) => {
     const c = makeCard(icon(def.icon), () => h.buy('skill', def.id));
@@ -409,20 +411,14 @@ export function createUI(h) {
 
   el.modal.addEventListener('click', (e) => { if (e.target === el.modal) closeModal(); });
 
-  // Version label in the top-right corner; opens the release notes.
+  // Version label in the top-right corner; opens the patch notes in the blog.
   set(el.version, `v${VERSION}`);
-  el.version.addEventListener('click', () => {
-    const list = make('div', 'changelog');
-    for (const entry of CHANGELOG) {
-      const head = make('h3', null, `v${entry.version}`);
-      head.append(make('span', null, entry.date));
-      const ul = make('ul');
-      for (const note of entry.notes) ul.append(make('li', null, note));
-      list.append(head, ul);
-    }
-    openModal({ title: 'Sürüm Notları', body: list, actions: [{ label: 'Kapat' }] });
+  el.version.addEventListener('click', () => windows.open('blog', { tab: 'notes' }));
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!el.modal.hidden) closeModal();
+    else if (windows.isOpen) windows.close();
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.modal.hidden) closeModal(); });
 
   let toastTimer = null;
   function toast(msg) {
@@ -449,7 +445,8 @@ export function createUI(h) {
         lastPanel = now;
         updateShop(state);
         if (tab === 'rebirth') updateRebirth(state);
-        if (tab === 'menu') updateMenu(state);
+        if (windows.current === 'settings') updateMenu(state);
+        windows.update(state);
       }
     },
     refresh() { lastPanel = 0; },
@@ -459,6 +456,9 @@ export function createUI(h) {
     openModal,
     closeModal,
     get modalOpen() { return !el.modal.hidden; },
+    get windowOpen() { return windows.isOpen; },
+    openWindow: (name, opts) => { windows.open(name, opts); lastPanel = 0; },
+    closeWindow: () => windows.close(),
     toast,
     pulseGold,
     make,

@@ -6,7 +6,9 @@ import { createAnimator } from '../js/anim.js';
 import { ICONS } from '../js/icons.js';
 import { paintBackdrop, paintDungeon, createWeather, THEME_IDS } from '../js/scenery.js';
 import { createFx } from '../js/fx.js';
-import { UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES } from '../js/config.js';
+import { UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES, MAIL } from '../js/config.js';
+import { NEWS } from '../js/news.js';
+import { existsSync } from 'node:fs';
 
 // A stand-in for CanvasRenderingContext2D that records path coordinates, so drawing code can
 // run under Node and every number it produces can be checked.
@@ -181,4 +183,25 @@ test('effects run their whole lifetime', () => {
   assert.equal(hit, 1);
   assert.equal(fx.bannerActive, false);
   assert.ok(ctx.numbers.every(Number.isFinite));
+});
+
+test('blog posts and mails are complete and their covers exist', () => {
+  const ids = new Set();
+  for (const n of NEWS) {
+    assert.ok(!ids.has(n.id), `duplicate news id ${n.id}`);
+    ids.add(n.id);
+    assert.match(n.date, /^\d{4}-\d{2}-\d{2}$/, n.id);
+    assert.ok(n.title && n.body.length, n.id);
+    if (n.cover.startsWith('scene:')) {
+      const [, theme, enemy] = n.cover.split(':');
+      assert.ok(THEME_IDS.includes(theme), n.id);
+      if (enemy) assert.ok(ZONES.some((z) => z.enemies.some((e) => e.actor === enemy)), n.id);
+    } else {
+      assert.ok(existsSync(new URL(`../${n.cover}`, import.meta.url)), `${n.id}: missing ${n.cover}`);
+    }
+  }
+  for (let i = 1; i < NEWS.length; i++) assert.ok(NEWS[i - 1].date >= NEWS[i].date, 'newest first');
+  const mailIds = new Set(MAIL.map((m) => m.id));
+  assert.equal(mailIds.size, MAIL.length);
+  for (const m of MAIL) assert.ok(m.title && m.from && m.body.length, m.id);
 });

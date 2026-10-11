@@ -29,6 +29,14 @@ The rules are the same as Piksel Savaşçı:
 - The zone changes every 10 stages.
 - Upgrades, pets with eggs and evolutions, the dungeon with companions, five active skills and rebirth for soul stones all work as before.
 
+Extras since v0.2, behind the menu button under the version label in the top-right:
+
+- **Günlük Giriş:** a reward every day on a 7-day streak. The gold grows with progress, and day 7 adds elmas.
+- **Posta:** mails with gifts. New players get their first 100 elmas here.
+- **Lider Tablosu:** coming soon.
+- **Blog:** patch notes by version, and announcements with cover pictures.
+- **Ayarlar:** statistics, sound and music, and save codes.
+
 What's new is how it looks and sounds:
 
 - **Vector art:** every character, enemy, pet, icon and zone is drawn in code with thick outlines and two-tone shading, at the screen's real resolution.
@@ -57,6 +65,7 @@ Saves from Piksel Savaşçı don't carry over: the save code import only accepts
 | `js/render.js`, `js/dungeon-view.js` | The battle and dungeon scenes |
 | `js/icons.js` | UI icons and portraits |
 | `js/sound.js` | Sound effects and music (WebAudio) |
-| `js/ui*.js`, `js/main.js`, `js/store.js` | Interface, game loop and saving |
+| `js/ui*.js`, `js/main.js`, `js/store.js` | Interface (incl. the menu windows in `ui-windows.js`), game loop and saving |
+| `js/news.js` | Blog announcements |
 | `tools/pose-lab.html` | Development view of every actor and its animation frames |
 | `tools/icon-server.js`, `tools/icons.html` | Icon generator (`npm run icons`) |

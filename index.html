@@ -23,6 +23,7 @@
     <section id="battle" aria-label="Savaş alanı">
       <canvas id="scene"></canvas>
       <button id="version-btn" class="version" type="button" aria-label="Sürüm notları"></button>
+      <button id="menu-btn" class="menu-btn" type="button" aria-label="Menü" aria-haspopup="true" aria-expanded="false"><img data-icon="menuList" alt=""></button>
 
       <div id="hud">
         <div class="hud-top">
@@ -121,27 +122,6 @@
           </div>
         </div>
 
-        <div class="page" data-tab="menu" hidden>
-          <div class="card info">
-            <h3>İstatistikler</h3>
-            <div id="stats"></div>
-          </div>
-          <div class="card info">
-            <h3>Ayarlar</h3>
-            <div class="stat-row"><span>Ses efektleri</span><button id="sound-btn" class="btn small" type="button">Açık</button></div>
-            <div class="stat-row"><span>Müzik</span><button id="music-btn" class="btn small" type="button">Açık</button></div>
-          </div>
-          <div class="card info">
-            <h3>Kayıt</h3>
-            <p class="note">İlerleme bu cihazda otomatik kaydedilir. Başka bir cihaza taşımak için kayıt kodunu dışa aktar.</p>
-            <div class="btn-row">
-              <button id="save-btn" class="btn" type="button">Kaydet</button>
-              <button id="export-btn" class="btn" type="button">Dışa Aktar</button>
-              <button id="import-btn" class="btn" type="button">İçe Aktar</button>
-            </div>
-            <button id="reset-btn" class="btn danger" type="button">Her Şeyi Sıfırla</button>
-          </div>
-        </div>
       </div>
 
       <nav id="tabs" role="tablist">
@@ -150,9 +130,51 @@
         <button class="tab" type="button" role="tab" data-tab="dungeon" aria-selected="false"><img data-icon="tabDungeon" alt=""><span>Zindan</span></button>
         <button class="tab" type="button" role="tab" data-tab="skills" aria-selected="false"><img data-icon="skStorm" alt=""><span>Yetenek</span></button>
         <button class="tab" type="button" role="tab" data-tab="rebirth" aria-selected="false"><img data-icon="soul" alt=""><span>Doğuş</span></button>
-        <button class="tab" type="button" role="tab" data-tab="menu" aria-selected="false"><img data-icon="menu" alt=""><span>Menü</span></button>
       </nav>
     </section>
+
+    <!-- Top-right menu: a square bubble of shortcuts, each opening a window. -->
+    <div id="menu-pop" class="menu-pop" role="menu" hidden>
+      <button type="button" role="menuitem" data-window="daily"><img data-icon="daily" alt=""><span>Günlük Giriş</span></button>
+      <button type="button" role="menuitem" data-window="mail"><img data-icon="mail" alt=""><span>Posta</span></button>
+      <button type="button" role="menuitem" data-window="leaderboard"><img data-icon="trophy" alt=""><span>Lider Tablosu</span></button>
+      <button type="button" role="menuitem" data-window="blog"><img data-icon="scroll" alt=""><span>Blog</span></button>
+      <button type="button" role="menuitem" data-window="settings"><img data-icon="menu" alt=""><span>Ayarlar</span></button>
+    </div>
+
+    <div id="window" hidden>
+      <div class="window-box card" role="dialog" aria-modal="true" aria-labelledby="window-title">
+        <div class="window-head">
+          <img id="window-icon" alt="">
+          <h2 id="window-title"></h2>
+          <button id="window-close" class="close-btn" type="button" aria-label="Kapat">✕</button>
+        </div>
+        <div id="window-body"></div>
+      </div>
+    </div>
+
+    <!-- Ayarlar window content; moved into #window-body when opened. -->
+    <div id="settings-view" class="window-view" hidden>
+      <div class="card info">
+        <h3>İstatistikler</h3>
+        <div id="stats"></div>
+      </div>
+      <div class="card info">
+        <h3>Ayarlar</h3>
+        <div class="stat-row"><span>Ses efektleri</span><button id="sound-btn" class="btn small" type="button">Açık</button></div>
+        <div class="stat-row"><span>Müzik</span><button id="music-btn" class="btn small" type="button">Açık</button></div>
+      </div>
+      <div class="card info">
+        <h3>Kayıt</h3>
+        <p class="note">İlerleme bu cihazda otomatik kaydedilir. Başka bir cihaza taşımak için kayıt kodunu dışa aktar.</p>
+        <div class="btn-row">
+          <button id="save-btn" class="btn" type="button">Kaydet</button>
+          <button id="export-btn" class="btn" type="button">Dışa Aktar</button>
+          <button id="import-btn" class="btn" type="button">İçe Aktar</button>
+        </div>
+        <button id="reset-btn" class="btn danger" type="button">Her Şeyi Sıfırla</button>
+      </div>
+    </div>
 
     <div id="toast" role="status" hidden></div>
 

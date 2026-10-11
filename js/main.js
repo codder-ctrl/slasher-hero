@@ -5,6 +5,8 @@ import { createRenderer } from './render.js';
 import { createUI } from './ui.js';
 import { createDungeonView } from './dungeon-view.js';
 import * as D from './dungeon.js';
+import { VERSION } from './changelog.js';
+import { NEWS } from './news.js';
 import { sfx, unlockAudio, setSoundEnabled, setMusicEnabled, setMusicMood, pauseAudio } from './sound.js';
 
 // Wires everything together: the game loop, input, saving and the UI handlers.
@@ -121,6 +123,38 @@ const ui = createUI({
   selectPet(id) {
     if (L.selectPet(state, id)) { sfx.buy(); ui.refresh(); }
   },
+  claimDaily() {
+    const reward = L.claimDaily(state);
+    if (!reward) return;
+    unlockAudio();
+    sfx.win();
+    renderer.coinShower(12 + reward.day * 4);
+    ui.toast(reward.elmas ? `+${L.formatNumber(reward.gold)} altın, +${reward.elmas} elmas` : `+${L.formatNumber(reward.gold)} altın`);
+    store.save(state);
+    ui.refresh();
+  },
+  readMail(id) {
+    if (L.readMail(state, id)) ui.refresh();
+  },
+  claimMail(id) {
+    const reward = L.claimMail(state, id);
+    if (!reward) return;
+    unlockAudio();
+    sfx.egg();
+    const parts = [];
+    if (reward.elmas) parts.push(`+${reward.elmas} elmas`);
+    if (reward.gold) parts.push(`+${L.formatNumber(reward.gold)} altın`);
+    if (reward.kristal) parts.push(`+${reward.kristal} kristal`);
+    ui.toast(parts.join(', '));
+    store.save(state);
+    ui.refresh();
+  },
+  // The blog marks the current version (patch notes) or every announcement as seen.
+  markSeen(which) {
+    if (which === 'notes') state.seen.version = VERSION;
+    else for (const n of NEWS) if (!state.seen.news.includes(n.id)) state.seen.news.push(n.id);
+    ui.refresh();
+  },
   companion(id) {
     const ok = state.companions[id] > 0 ? D.levelUpCompanion(state, id) : D.recruit(state, id);
     if (ok) { sfx.buy(); ui.refresh(); }
@@ -209,6 +243,7 @@ const ui = createUI({
             if (!L.isOwnSave(raw)) { ui.toast('Bu kod Slasher Hero kaydı değil'); return false; }
             replaceState(L.loadState(raw));
             store.save(state);
+            ui.closeWindow();
             ui.toast('Kayıt yüklendi');
             return true;
           },
@@ -229,6 +264,7 @@ const ui = createUI({
             store.clear();
             replaceState(L.newGame());
             store.save(state);
+            ui.closeWindow();
             ui.setTab('hero');
           },
         },
@@ -258,6 +294,8 @@ function catchUp(seconds) {
 }
 
 catchUp((Date.now() - state.lastSeen) / 1000);
+// Today's login reward greets the player (the welcome-back modal, if any, sits on top).
+if (L.dailyStatus(state).canClaim) ui.openWindow('daily');
 
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
@@ -292,7 +330,7 @@ battle.addEventListener('pointerdown', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.repeat || ui.modalOpen || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.repeat || ui.modalOpen || ui.windowOpen || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest?.('button, textarea, input')) return;
   if (e.code === 'Space' || e.key === 'Enter') {
     e.preventDefault();

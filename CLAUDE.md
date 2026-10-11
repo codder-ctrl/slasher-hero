@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Slasher Hero: the high-graphics successor of Piksel Savaşçı (`../piksel-savasci`). Same phone-first idle clicker (battle on top, tabbed panel below: Kahraman, Pet, Zindan, Yetenek, Doğuş, Menü), redrawn as storybook vector art in a Kingdom Rush-like style. `index.html`, `styles.css`, native ES modules in `js/`. No build step and no npm dependencies; the only external resources are the Lilita One and Fredoka fonts from Google Fonts. Keep it that way unless asked. UI text is Turkish.
+Slasher Hero: the high-graphics successor of Piksel Savaşçı (`../piksel-savasci`). Same phone-first idle clicker (battle on top, tabbed panel below: Kahraman, Pet, Zindan, Yetenek, Doğuş; a menu button under the version label opens Günlük Giriş, Posta, Lider Tablosu, Blog and Ayarlar), redrawn as storybook vector art in a Kingdom Rush-like style. `index.html`, `styles.css`, native ES modules in `js/`. No build step and no npm dependencies; the only external resources are the Lilita One and Fredoka fonts from Google Fonts. Keep it that way unless asked. UI text is Turkish.
 
 The game rules (`logic.js`, `dungeon.js`, `store.js`, most of `config.js`) came over from Piksel Savaşçı unchanged; the drawing, sound and UI skin are new. Saves are separate: the storage key differs and save codes carry `game: 'slasher-hero'`, so Piksel Savaşçı codes are refused on import (the user asked for that).
 
@@ -18,7 +18,7 @@ The user doesn't read code. Big steps go: plan → build → present with a 1–
 2. Add an entry at the top of `CHANGELOG` in `js/changelog.js`: version, today's date, short Turkish notes for players.
 3. Set the same version in `package.json`. `tests/pwa.test.js` fails if they differ or the list isn't newest-first.
 
-The version is the faint label in the top-right of the battle; tapping it opens the notes. Keep it faint.
+The version is the faint label in the top-right of the battle; tapping it opens the patch notes in the blog. Keep it faint. Announcements with a cover go in `js/news.js` (newest first; covers are `scene:<theme>[:<enemy>]` or an image file under `news/`).
 
 ## Running and testing
 
@@ -47,6 +47,9 @@ Repo: `codder-ctrl/slasher-hero` (public). GitHub Pages serves the repo root of 
 - **`icons.js`** — UI icons (`ICONS`) and actor portraits (`iconUrl('actor:dog', look)`), rendered to PNG data URLs at the screen's density. `data-icon` names in `index.html` must exist in `ICONS` (tested).
 - **`sound.js`** — synthesized effects through a compressor and a generated reverb, plus a small sequencer for background music: one mood per zone (key, tempo, drums), faster for bosses. `settings.music` and `settings.sound` are separate toggles.
 - **`ui.js`** — unchanged structure from Piksel Savaşçı: builds cards once, updates text through `set()`, never mutates state.
+- **`ui-windows.js`** — the top-right menu bubble and its parchment windows. Views are built when a window opens and updated with the panel refresh; the Ayarlar view is the `#settings-view` element from `index.html`, moved into the window. Badges: daily claimable, unread or uncollected mail, unseen patch notes or news.
+- **Daily login and mail** (`logic.js`) — `claimDaily(state, now)` works on local calendar days (`dayKey`): consecutive days walk the 7-slot `DAILY` cycle, a gap restarts it, gold is worth `DAILY.gold[i]` enemies of the farmed frontier stage. `MAIL` (config) is shown to everyone; `state.mail.claimed/read` hold ids. New players start with 0 elmas and get 100 from the `welcome` mail; v1 saves (which started with 100) get it marked claimed. Daily, mail and `seen` survive rebirth; skill levels and cooldowns don't.
+- **Leaderboard** — placeholder ("Çok yakında..."). A real one needs an online backend (accounts, score submission, cheat checks); GitHub Pages can't store other players' scores.
 
 ## Rules to keep
 
