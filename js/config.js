@@ -1,7 +1,7 @@
 // Game constants and content tables. Pure data with no DOM access, so tests can import it.
 
 export const STORAGE_KEY = 'slasher-hero-v1';
-export const SAVE_VERSION = 2;           // 2: the 100 starting elmas moved into the welcome mail
+export const SAVE_VERSION = 3;           // 2: welcome mail elmas; 3: soul points for existing souls
 // Every save and save code carries this tag; codes without it (e.g. from Piksel Savaşçı) are refused.
 export const GAME_ID = 'slasher-hero';
 
@@ -46,7 +46,70 @@ export const UPGRADES = [
   { id: 'critDmg', name: 'Ölümcül Darbe', icon: 'bolt',   baseCost: 400,  growth: 1.55, max: Infinity, desc: 'Kritik vuruşların hasar çarpanı' },
   { id: 'greed',   name: 'Altın Kese',    icon: 'bag',    baseCost: 250,  growth: 1.5,  max: Infinity, desc: 'Düşmanlardan düşen altın' },
   { id: 'spirit',  name: 'Savaş Ruhu',    icon: 'flame',  baseCost: 3000, growth: 1.6,  max: Infinity, desc: 'Pet hasarının bir kısmı dokunuşa eklenir' },
+  { id: 'vitality', name: 'Dayanıklılık', icon: 'heart',  baseCost: 60,   growth: 1.07, max: Infinity, desc: 'Kahramanın canı (+%2.5 her seviye)' },
+  { id: 'armor',   name: 'Demir Zırh',    icon: 'shield', baseCost: 150,  growth: 1.08, max: Infinity, desc: 'Alınan hasarı azaltır' },
 ];
+
+// ---- Hero health and armor ----
+// Max HP = hpBase × hpGrowth^(Dayanıklılık level) × souls.
+// Armor = armorPerLevel × Demir Zırh level; damage taken × armorK / (armorK + armor), so armor
+// always helps a little less than the point before and damage only approaches zero.
+export const HERO = {
+  hpBase: 100,
+  hpGrowth: 1.025,     // per level; with the 1.07 cost growth this keeps pace with ATTACK.atkGrowth
+  armorPerLevel: 4,
+  armorK: 100,
+  regen: 0.2,          // fraction of max HP restored per second while nothing is attacking
+};
+
+// ---- Combo ----
+// Each tap within `window` seconds of the last hit keeps the combo going; reaching a tier
+// multiplies tap damage. Kılıç Fırtınası's automatic hits don't count.
+export const COMBO = {
+  window: 0.75,
+  tiers: [
+    { at: 10, mult: 1.1 },
+    { at: 25, mult: 1.2 },
+    { at: 50, mult: 1.35 },
+    { at: 100, mult: 1.5 },
+  ],
+};
+
+// ---- Enemy attacks ----
+// Bosses (and elites, weaker) wind up an attack every `every` seconds. During the `windup`
+// the player can tap `taps` times to interrupt it: the enemy is stunned and takes extra damage.
+// Otherwise the hit lands for atkBase × atkGrowth^(stage-1) (eased in over the first `ramp`
+// stages), reduced by armor. Tuned so a hero who keeps up Dayanıklılık and Demir Zırh
+// with ~15% of their gold takes about a fifth of their HP per hit at the frontier (fitted with
+// `node tools/sim.js --share 0.15 --curve`). A knocked-out
+// hero loses a boss fight like the timer running out; an elite just runs off.
+export const ATTACK = {
+  first: 3,
+  every: 6,
+  windup: 1.4,
+  taps: 8,
+  stun: 2.5,
+  stunBonus: 1.5,      // damage multiplier on a stunned enemy
+  atkBase: 6,
+  atkGrowth: 1.16,
+  ramp: 30,
+  eliteAtk: 0.35,      // elites hit for this share of a boss of the same stage
+  eliteEvery: 5,
+};
+
+// Zone bosses (every SHIELD_EVERY stages) start behind a shield worth `shield` of their HP.
+// Taps hit it fully, pet damage only by `petMult`. Breaking it stuns the boss.
+export const SHIELD = { every: 10, shield: 0.2, petMult: 0.25 };
+
+// ---- Special enemies ----
+// Rolled for ordinary (non-boss) enemies from `minStage` on.
+export const SPECIALS = {
+  minStage: 3,
+  goblin: { chance: 0.03, hp: 2, gold: 15, flee: 8,       // carries gold and runs away
+            actor: 'goblin', name: 'Hazine Goblini', colors: { body: '#7cc65a', accent: '#8a5a32' } },
+  elite: { chance: 0.07, hp: 3, gold: 4 },                 // tougher, attacks, pays more
+  armored: { chance: 0.1, nonCrit: 0.25 },                 // only crits hit fully
+};
 
 // Active skills: used from the skill bar, then they cool down. They unlock at `unlockStage`
 // (in the current run) and are leveled with gold; effect per level is in logic.skillPower.
@@ -84,12 +147,18 @@ export const RARITIES = [
   { id: 'legendary', name: 'Efsanevi', color: '#e09010', weight: 1.5, mult: 4,   evolveCost: [300, 1200] },
 ];
 
+// Pet abilities (`ability`) grow with the evolution form: × ABILITY_FORM_MULT[form - 1].
+// `every` ones trigger on a timer while the pet fights; the rest are passive. In `text`,
+// {power} shows as a percentage for keen/scan/revive.
+export const ABILITY_FORM_MULT = [1, 1.5, 2];
+
 // Each pet is a vector actor (js/pets.js) drawn with its form's colors: `body`, `belly`, `dark`
 // and `accent`. From form 2 the actor adds armor or markings in `accent`; form 3 adds a glowing
 // aura or flames in `glow`. `shot` is the projectile it fires at the enemy.
 export const PETS = [
   {
     id: 'dog', rarity: 'common', actor: 'dog', shot: 'spark', shotColor: '#fff6d8',
+    ability: { id: 'bark', name: 'Havlama', every: 10, power: 1, text: 'Her {every} sn havlar, düşmanı {power} sn sersemletir.' },
     forms: [
       { name: 'Köpek',           colors: { body: '#cf9a5e', belly: '#f4dfb6', dark: '#8a5a32', accent: '#d8443e', glow: '#ffd060' } },
       { name: 'Kurt',            colors: { body: '#9fb2c2', belly: '#e8eff4', dark: '#566a7c', accent: '#c0384a', glow: '#ffd060' } },
@@ -98,6 +167,7 @@ export const PETS = [
   },
   {
     id: 'cat', rarity: 'common', actor: 'cat', shot: 'spark', shotColor: '#ffc0d0',
+    ability: { id: 'keen', name: 'Keskin Pençe', power: 0.05, text: 'Kritik şansı +%{power}.' },
     forms: [
       { name: 'Kedi',         colors: { body: '#f08a48', belly: '#fde6c6', dark: '#b85a26', accent: '#b85a26', glow: '#ffd060' } },
       { name: 'Vaşak',        colors: { body: '#dba45e', belly: '#f6e4c2', dark: '#7a4c2a', accent: '#3a2c28', glow: '#ffd060' } },
@@ -106,6 +176,7 @@ export const PETS = [
   },
   {
     id: 'robot', rarity: 'rare', actor: 'robot', shot: 'arrow', shotColor: '#7ff4ff',
+    ability: { id: 'laser', name: 'Lazer', every: 8, power: 5, text: 'Her {every} sn lazer atar: pet hasarının ×{power} katı.' },
     forms: [
       { name: 'Mini Robot',   colors: { body: '#aec0ce', belly: '#dce6ee', dark: '#6a7f92', accent: '#5bc8e8', glow: '#7ff4ff' } },
       { name: 'Savaş Robotu', colors: { body: '#64788e', belly: '#94a8ba', dark: '#3c4a5c', accent: '#ef6a4a', glow: '#ffb060' } },
@@ -114,6 +185,7 @@ export const PETS = [
   },
   {
     id: 'drone', rarity: 'rare', actor: 'drone', shot: 'arrow', shotColor: '#ff9a6a', float: true,
+    ability: { id: 'scan', name: 'Hazine Tarayıcı', power: 0.15, text: 'Altın +%{power}.' },
     forms: [
       { name: 'Drone',         colors: { body: '#aec0ce', belly: '#dce6ee', dark: '#6a7f92', accent: '#ef6a4a', glow: '#ffb060' } },
       { name: 'Saldırı Dronu', colors: { body: '#3e4a60', belly: '#64788e', dark: '#232b3a', accent: '#ff5a3a', glow: '#ff9a3a' } },
@@ -122,6 +194,7 @@ export const PETS = [
   },
   {
     id: 'dragon', rarity: 'epic', actor: 'dragon', shot: 'orb', shotColor: '#ff8a3a',
+    ability: { id: 'breath', name: 'Alev Nefesi', every: 9, power: 2, burn: 3, text: 'Her {every} sn alev püskürtür: {burn} sn boyunca saniyede pet hasarının ×{power} katı.' },
     forms: [
       { name: 'Ejder Yavrusu', colors: { body: '#52c05e', belly: '#d2f08e', dark: '#2a8a5a', accent: '#f6f0dc', glow: '#ffb43a' } },
       { name: 'Genç Ejder',    colors: { body: '#2b8f92', belly: '#86dcae', dark: '#1a5c66', accent: '#ffd27a', glow: '#ffb43a' } },
@@ -130,6 +203,7 @@ export const PETS = [
   },
   {
     id: 'phoenix', rarity: 'legendary', actor: 'phoenix', shot: 'orb', shotColor: '#ffd060', float: true,
+    ability: { id: 'revive', name: 'Küllerinden Doğuş', power: 0.5, text: 'Kahraman bayılınca savaş başına bir kez canının %{power}\'iyle kalkar.' },
     forms: [
       { name: 'Anka Yavrusu', colors: { body: '#ff8a3a', belly: '#ffd862', dark: '#d84a2a', accent: '#ffe9a0', glow: '#ffb43a' } },
       { name: 'Anka Kuşu',    colors: { body: '#e0423a', belly: '#ffc84a', dark: '#9a2236', accent: '#ffe07a', glow: '#ff8a3a' } },
@@ -142,6 +216,96 @@ export const PETS = [
 // One claim per local calendar day. Claiming on consecutive days walks through the 7-day cycle;
 // missing a day starts it over. Gold is worth `gold[i]` enemies of the stage the player farms,
 // so the reward keeps up with progress (and shrinks again after a rebirth).
+// ---- Equipment ----
+// Three slots. Every item has its slot's first stat and, by rarity, 0–2 more from the slot's
+// list. A stat is worth base × EQUIP.rarityMult × roll (0.8–1.2) × (1 + levelStep × (level-1)).
+// Values add up across slots; see logic.js for where each one applies.
+export const EQUIP_SLOTS = [
+  { id: 'weapon', name: 'Silah',  stats: ['tap', 'critDmg', 'boss'], names: ['Demir Kılıç', 'Çelik Kılıç', 'Ejder Kılıcı', 'Yıldız Kılıcı'] },
+  { id: 'helm',   name: 'Kask',   stats: ['hp', 'armor', 'stun'],    names: ['Deri Kask', 'Çelik Miğfer', 'Ejder Miğferi', 'Yıldız Tacı'] },
+  { id: 'charm',  name: 'Tılsım', stats: ['gold', 'pet', 'combo'],   names: ['Bakır Tılsım', 'Gümüş Tılsım', 'Ejder Gözü', 'Yıldız Kalbi'] },
+];
+// kind: 'pct' shows +%, 'mult' +×, 'flat' +n, 'sec' +n sn.
+export const EQUIP_STATS = {
+  tap:     { name: 'Dokunuş hasarı', base: 0.25, kind: 'pct' },
+  critDmg: { name: 'Kritik çarpanı', base: 0.3,  kind: 'mult' },
+  boss:    { name: 'Boss hasarı',    base: 0.3,  kind: 'pct' },
+  hp:      { name: 'Can',            base: 0.25, kind: 'pct' },
+  armor:   { name: 'Zırh',           base: 15,   kind: 'flat' },
+  stun:    { name: 'Sersemletme',    base: 0.3,  kind: 'sec' },
+  gold:    { name: 'Altın',          base: 0.15, kind: 'pct' },
+  pet:     { name: 'Pet hasarı',     base: 0.25, kind: 'pct' },
+  combo:   { name: 'Kombo süresi',   base: 0.08, kind: 'sec' },
+};
+export const EQUIP = {
+  rarityMult: [1, 1.8, 3, 5],     // by RARITIES index
+  statCount: [1, 2, 2, 3],
+  levelStep: 0.15,
+  maxLevel: 20,
+  bagSize: 40,
+  upgradeBase: 8,                 // kristal for level 2; × upgradeGrowth per level × upgradeRarity
+  upgradeGrowth: 1.22,
+  upgradeRarity: [1, 1.6, 2.5, 4],
+  salvage: 4,                     // kristal per (rarityMult × level)
+  chestCost: 60,                  // elmas
+  bossChance: 0.08,               // drop chance on repeat boss kills; first wins always drop
+};
+
+// ---- Soul tree ----
+// Every soul stone earned in a rebirth also gives a soul point to spend here; souls keep their
+// +10% damage. Level L+1 of a node costs L+1 points. `step` is the effect per level.
+export const SOUL_BRANCHES = [
+  { id: 'war', name: 'Savaş' },
+  { id: 'wealth', name: 'Servet' },
+  { id: 'time', name: 'Zaman' },
+];
+export const SOUL_TREE = [
+  { id: 'tapPower',   branch: 'war',    name: 'Kılıç Ustalığı',    text: 'Dokunuş hasarı +%{v}',               max: 10, step: 0.15, kind: 'pct' },
+  { id: 'petPower',   branch: 'war',    name: 'Pet Bağı',          text: 'Pet hasarı +%{v}',                   max: 10, step: 0.15, kind: 'pct' },
+  { id: 'bossTime',   branch: 'war',    name: 'Sabır',             text: 'Boss süresi +{v} sn',                max: 5,  step: 2,    kind: 'num' },
+  { id: 'goldPower',  branch: 'wealth', name: 'Hazine Kokusu',     text: 'Altın +%{v}',                        max: 10, step: 0.1,  kind: 'pct' },
+  { id: 'startStage', branch: 'wealth', name: 'Kestirme Yol',      text: 'Doğuştan sonra {v}. bölümden başla', max: 6,  step: 5,    kind: 'stage' },
+  { id: 'offline',    branch: 'wealth', name: 'Uykuda Kazanç',     text: 'Çevrimdışı altın +%{v}',             max: 5,  step: 0.2,  kind: 'pct' },
+  { id: 'skillTime',  branch: 'time',   name: 'Uzun Öfke',         text: 'Yetenek süresi +%{v}',               max: 5,  step: 0.1,  kind: 'pct' },
+  { id: 'cooldown',   branch: 'time',   name: 'Hızlı Toparlanma',  text: 'Bekleme süresi −%{v}',               max: 5,  step: 0.06, kind: 'pct' },
+  { id: 'comboTime',  branch: 'time',   name: 'Ritim',             text: 'Kombo süresi +{v} sn',               max: 5,  step: 0.1,  kind: 'num' },
+];
+
+// ---- Daily quests ----
+// Three a day, picked by the date from this pool. `stat` counts up from the day's start value;
+// `combo` is the best combo of the day. Finishing all three pays QUEST_BONUS.
+export const QUESTS = [
+  { id: 'kills',      text: '{n} düşman yen',               stat: 'kills',      n: 250,  reward: { elmas: 10 } },
+  { id: 'bosses',     text: '{n} boss yen',                 stat: 'bossKills',  n: 3,    reward: { elmas: 15 } },
+  { id: 'skills',     text: '{n} yetenek kullan',           stat: 'skillsUsed', n: 4,    reward: { kristal: 30 } },
+  { id: 'taps',       text: '{n} kez dokun',                stat: 'taps',       n: 800,  reward: { kristal: 20 } },
+  { id: 'combo',      text: '{n} komboya ulaş',             stat: 'combo',      n: 50,   reward: { elmas: 10 } },
+  { id: 'interrupts', text: '{n} boss saldırısını kes',     stat: 'interrupts', n: 3,    reward: { elmas: 15 } },
+  { id: 'floors',     text: 'Zindanda {n} kat temizle',     stat: 'floors',     n: 5,    reward: { kristal: 40 } },
+  { id: 'levels',     text: '{n} güçlendirme seviyesi al',  stat: 'levels',     n: 30,   reward: { kristal: 25 } },
+  { id: 'elites',     text: '{n} elit düşman yen',          stat: 'elites',     n: 2,    reward: { elmas: 10 } },
+];
+export const QUESTS_PER_DAY = 3;
+export const QUEST_BONUS = { elmas: 25 };
+
+// ---- Achievements ----
+// Permanent goals in tiers; each tier is collected once. `stat` is a stats counter, or one of
+// the derived values in logic.achievementValue ('pets', 'dungeon').
+export const ACHIEVEMENTS = [
+  { id: 'stage',      name: 'Kaşif',             text: '{n}. bölüme ulaş',             stat: 'bestStage',  tiers: [25, 50, 100, 150, 200] },
+  { id: 'kills',      name: 'Avcı',              text: '{n} düşman yen',               stat: 'kills',      tiers: [500, 5000, 50000, 500000] },
+  { id: 'bosses',     name: 'Boss Avcısı',       text: '{n} boss yen',                 stat: 'bossKills',  tiers: [10, 50, 200, 1000] },
+  { id: 'combo',      name: 'Kombo Ustası',      text: '{n} komboya ulaş',             stat: 'maxCombo',   tiers: [25, 50, 100, 200] },
+  { id: 'interrupts', name: 'Savuşturan',        text: '{n} boss saldırısını kes',     stat: 'interrupts', tiers: [5, 50, 250] },
+  { id: 'shields',    name: 'Kalkan Kıran',      text: '{n} boss kalkanı kır',         stat: 'shields',    tiers: [1, 10, 50] },
+  { id: 'goblins',    name: 'Hazine Avcısı',     text: '{n} hazine goblini yakala',    stat: 'goblins',    tiers: [1, 10, 50] },
+  { id: 'elites',     name: 'Elit Avcı',         text: '{n} elit düşman yen',          stat: 'elites',     tiers: [5, 50, 250] },
+  { id: 'pets',       name: 'Koleksiyoncu',      text: '{n} farklı pet topla',         stat: 'pets',       tiers: [2, 4, 6] },
+  { id: 'dungeon',    name: 'Zindan Fatihi',     text: 'Zindanda {n}. kata ulaş',      stat: 'dungeon',    tiers: [10, 25, 50, 100] },
+  { id: 'rebirth',    name: 'Yeniden Doğan',     text: '{n} kez yeniden doğ',          stat: 'prestiges',  tiers: [1, 5, 20] },
+];
+export const ACHIEVEMENT_ELMAS = [10, 20, 30, 50, 80];   // by tier
+
 export const DAILY = {
   gold: [20, 30, 45, 60, 80, 100, 150],
   elmas: [0, 0, 0, 0, 0, 0, 20],
@@ -194,6 +358,15 @@ export const COMPANIONS = [
   { id: 'dragon',   name: 'Ejder Binici Ada', role: 'dps',    actor: 'helm', colors: { main: '#c43a4a', trim: '#ff8a3a' }, shot: 'orb',   shotColor: '#ff8a3a' },
 ];
 
+// Team synergies: active while the team matches `need` (role counts, or `distinct` roles).
+// `bonus` multiplies the stats of the fighters with `roles` (all when omitted).
+export const SYNERGIES = [
+  { id: 'arcane',  name: 'Büyü Ustaları', text: 'Büyücülerin saldırısı +%25',        need: { mage: 2 },           roles: ['mage'],  bonus: { atk: 0.25 } },
+  { id: 'hunters', name: 'Avcı Sürüsü',   text: 'Vurucuların saldırısı +%20',        need: { dps: 2 },            roles: ['dps'],   bonus: { atk: 0.2 } },
+  { id: 'fortress', name: 'Kale',         text: 'Tank canı +%30, şifa +%20',         need: { tank: 1, healer: 1 }, roles: ['tank', 'healer'], bonus: { hp: 0.3, heal: 0.2 } },
+  { id: 'balance', name: 'Denge',         text: '3 farklı rol: herkes +%10',         distinct: 3,                              bonus: { atk: 0.1, hp: 0.1, heal: 0.1 } },
+];
+
 // ---- Dungeon ----
 export const DUNGEON = {
   companionPower: 1.3,     // each later companion is this much stronger than the one before
@@ -214,6 +387,9 @@ export const DUNGEON = {
   defeatPause: 4,          // seconds to regroup after a wipe
   healBetween: 0.3,        // fraction of max HP restored after each floor
   bossElmas: 10,           // first clear of each boss floor
+  chestEvery: 10,          // first clear of every 10th floor opens a chest: an item + kristal
+  chestKristal: 3,         // × floor
+  offlineStep: 0.5,        // seconds per simulated step while the game was closed
   enemies: [
     { actor: 'slime',    colors: { body: '#7a3f86', accent: '#d0607a' } },
     { actor: 'skeleton', colors: { body: '#d6dcb8', accent: '#ff5a4a' } },

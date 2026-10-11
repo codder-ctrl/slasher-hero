@@ -1,10 +1,10 @@
 import { ACTORS } from './actors.js';
 import { createAnimator } from './anim.js';
-import { at, blob, line, flat, glow, shadow, tint, circle, ellipse, star, mix, darker, rgba } from './paint.js';
+import { at, blob, line, flat, glow, shadow, tint, circle, ellipse, star, roundRect, mix, darker, rgba, INK } from './paint.js';
 import { paintBackdrop, createWeather } from './scenery.js';
 import { createFx } from './fx.js';
-import { PETS, ZONES } from './config.js';
-import { zoneIndex, formatNumber, totalDps } from './logic.js';
+import { PETS, ZONES, SPECIALS, ATTACK, COMBO, RARITIES } from './config.js';
+import { zoneIndex, formatNumber, totalDps, heroMaxHp, comboTier } from './logic.js';
 
 // The battle scene. Everything is vector-drawn every frame at the screen's real resolution:
 // the canvas is sized in device pixels and the scene is SCENE_H units tall, so it stays sharp
@@ -31,7 +31,10 @@ export function createRenderer(canvas) {
 
   // ---- Actors ----
 
-  const hero = { anim: createAnimator(ACTORS.hero, { colors: {} }), out: {} };
+  const hero = { anim: createAnimator(ACTORS.hero, { colors: {} }), out: {}, flash: 0 };
+  let comboPop = 0;
+  let lastCombo = 0;
+  let beam = null;          // Robot's laser: { t, life }
   const trail = [];
   let swing = 0;
 
@@ -46,6 +49,7 @@ export function createRenderer(canvas) {
   let coinTargetCss = { x: 24, y: 24 };
   let onCoin = () => {};
   let onPetShot = () => {};
+  let hitSound = () => {};
   let warcryPulse = 0;
   let lastState = null;
 
@@ -64,13 +68,14 @@ export function createRenderer(canvas) {
 
   function makeEnemy(state) {
     const zone = ZONES[zoneIndex(state.stage)];
-    const spec = zone.enemies[state.enemy.kind] ?? zone.enemies[0];
+    const v = state.enemy.variant;
+    const spec = v === 'goblin' ? SPECIALS.goblin : zone.enemies[state.enemy.kind] ?? zone.enemies[0];
     const def = ACTORS[spec.actor];
-    const look = { colors: spec.colors, boss: state.enemy.boss };
+    const look = { colors: spec.colors, boss: state.enemy.boss, armored: v === 'armored', elite: v === 'elite' };
     const anim = createAnimator(def, look);
     anim.play('enter');
     anim.update(0);
-    return { stage: state.stage, boss: state.enemy.boss, def, look, anim, out: {}, flash: 0 };
+    return { stage: state.stage, boss: state.enemy.boss, variant: v, def, look, anim, out: {}, flash: 0 };
   }
 
   function syncPet(state) {
@@ -126,6 +131,11 @@ export function createRenderer(canvas) {
     const hover = e.def.hover || 0;
     shadow(ctx, enemyX() + P.x * -s, gy + 1, (e.def.height * 0.42 + 4) * s * (hover ? 0.7 : 1), 0.3 * a);
     if (e.boss) glow(ctx, enemyX(), gy - 4, 60, '#ff3a3a', 0.18 + 0.06 * Math.sin(time * 4));
+    if (e.look.elite) {
+      const c = enemyCenter(e);
+      glow(ctx, c.x, c.y, e.def.height * 1.1, '#ffd23a', (0.4 + 0.12 * Math.sin(time * 6)) * a);
+      if (Math.random() < 0.15) fx.particle({ x: c.x + Math.random() * 50 - 25, y: c.y + Math.random() * 40 - 20, vx: 0, vy: -30, g: 0, life: 0.5, size: 2.4, kind: 'star', color: '#fff2a0' });
+    }
     ctx.save();
     ctx.globalAlpha = a;
     ctx.translate(enemyX(), gy);
@@ -140,13 +150,18 @@ export function createRenderer(canvas) {
     const P = hero.anim.pose;
     const rage = state.skillTimers.rage.active > 0;
     shadow(ctx, heroX() + P.x, gy + 1, 22, 0.32);
+    hero.flash = Math.max(0, hero.flash - 1 / 60);
     if (rage) {
       glow(ctx, heroX() + P.x, gy - 46, 62, '#ff4a2a', 0.32 + 0.08 * Math.sin(time * 10));
     }
     if (state.skillTimers.storm.active > 0) glow(ctx, heroX() + P.x + 20, gy - 50, 56, '#7ff4ff', 0.22);
     ctx.save();
     ctx.translate(heroX(), gy);
-    ACTORS.hero.draw(ctx, P, { rage }, hero.out);
+    if (hero.flash > 0) { tint.amount = 0.6; tint.color = '#ff4a3a'; }
+    const eq = state.equipment.slots;
+    ACTORS.hero.draw(ctx, P, { rage, weapon: eq.weapon?.rarity ?? -1, helm: eq.helm?.rarity ?? -1 }, hero.out);
+    tint.amount = 0;
+    tint.color = '#ffffff';
     ctx.restore();
   }
 
@@ -264,6 +279,140 @@ export function createRenderer(canvas) {
     }
   }
 
+  // ---- Combat overlays (from live state) ----
+
+  // Wind-up warning, stun stars and the shield bubble on the current enemy.
+  function enemyOverlays(state) {
+    const e = state.enemy;
+    if (!enemy || e.respawn > 0) return;
+    const P = enemy.anim.pose;
+    const s = enemy.boss ? 1.5 : 1;
+    const c = enemyCenter();
+    const top = gy + (P.y - enemy.def.height) * s - (enemy.boss ? 26 : 10);
+    if (e.shield > 0) {
+      const frac = e.shield / e.shieldMax;
+      const rx = enemy.def.height * 0.72 * s;
+      const ry = enemy.def.height * 0.62 * s;
+      const pulse = 0.85 + 0.15 * Math.sin(time * 5);
+      ctx.save();
+      ctx.globalAlpha = 0.25 + 0.2 * frac;
+      flat(ctx, ellipse(c.x, c.y, rx, ry), '#8fd8ff');
+      ctx.restore();
+      line(ctx, ellipse(c.x, c.y, rx, ry), '#bff0ff', 3 * pulse, 0.9);
+      line(ctx, (g) => { g.ellipse(c.x - rx * 0.2, c.y - ry * 0.2, rx * 0.7, ry * 0.7, 0, Math.PI * 1.1, Math.PI * 1.45); }, '#ffffff', 2.4, 0.8);
+      if (frac < 0.6) {
+        line(ctx, (g) => {
+          g.moveTo(c.x - rx * 0.1, c.y - ry * 0.9); g.lineTo(c.x + rx * 0.1, c.y - ry * 0.4); g.lineTo(c.x - rx * 0.15, c.y - ry * 0.1);
+          if (frac < 0.3) { g.moveTo(c.x + rx * 0.9, c.y); g.lineTo(c.x + rx * 0.45, c.y + ry * 0.15); g.lineTo(c.x + rx * 0.5, c.y + ry * 0.5); }
+        }, '#ffffff', 2, 0.9);
+      }
+    }
+    if (e.stun > 0) {
+      const sy = Math.max(top + 8, SCENE_H * 0.52);
+      for (let i = 0; i < 3; i++) {
+        const a = time * 5 + (i / 3) * Math.PI * 2;
+        blob(ctx, star(c.x + Math.cos(a) * 20 * s, sy + Math.sin(a) * 6, 6, 2.6, 5, a), '#ffe07a', { ow: 1.6, depth: 0.6 });
+      }
+    }
+    const a = e.attack;
+    if (a && a.windup > 0) {
+      const k = 1 - a.windup / ATTACK.windup;
+      glow(ctx, c.x, gy - 6, 70 * s, '#ff2a2a', 0.25 + 0.2 * Math.sin(time * 18));
+      line(ctx, circle(c.x, c.y, (enemy.def.height * 0.9 + 40 * (1 - k)) * s), '#ff5a4a', 3, 0.5 + 0.5 * k);
+      // "!" bubble with one pip per tap still needed.
+      // Kept below the HUD even for tall or flying bosses.
+      const by = Math.max(top - 14, SCENE_H * 0.5) + Math.sin(time * 14) * 2;
+      blob(ctx, circle(c.x, by, 13), '#e0302a', { ow: 2.2, depth: 2 });
+      fx.text(ctx, '!', c.x, by + 0.5, 20, '#fff8e0', { sw: 0.18 });
+      const need = Math.max(0, a.need);
+      for (let i = 0; i < ATTACK.taps; i++) {
+        const px = c.x + (i - (ATTACK.taps - 1) / 2) * 8;
+        blob(ctx, circle(px, by + 20, 3.2), i < ATTACK.taps - need ? '#ffe07a' : '#5a2a2a', { ow: 1.4, shade: false, noLight: true });
+      }
+      if (state.stats.interrupts < 3) fx.text(ctx, 'HIZLI DOKUN!', c.x, by + 34, 11, '#ffe07a', { sw: 0.28 });
+    }
+  }
+
+  // The hero's health bar under their feet, shown while something can hit them or they're hurt.
+  function heroBar(state) {
+    const max = heroMaxHp(state);
+    const e = state.enemy;
+    const threat = e.attack && e.respawn <= 0;
+    if (!threat && state.hero.hp >= max - 0.5) return;
+    const frac = Math.max(0, state.hero.hp / max);
+    const x = heroX() + hero.anim.pose.x - 24;
+    const y = gy + 9;
+    blob(ctx, roundRect(x, y, 48, 7, 3.5), '#2a1b17', { ow: 1.4, shade: false, noLight: true });
+    const col = frac > 0.5 ? '#5ad05a' : frac > 0.25 ? '#f0b83a' : '#e0413b';
+    if (frac > 0) flat(ctx, roundRect(x + 1, y + 1, 46 * frac, 5, 2.5), col);
+    blob(ctx, (g) => { g.moveTo(x - 7, y + 6); g.bezierCurveTo(x - 13, y + 2, x - 12, y - 4, x - 7, y - 1); g.bezierCurveTo(x - 2, y - 4, x - 1, y + 2, x - 7, y + 6); g.closePath(); }, '#e0413b', { ow: 1.2, depth: 0.6 });
+  }
+
+  // Combo counter on the left, popping with each hit and colored by tier.
+  function comboMeter(state, dt) {
+    const c = state.combo;
+    if (c.count !== lastCombo) { if (c.count > lastCombo) comboPop = 1; lastCombo = c.count; }
+    comboPop = Math.max(0, comboPop - dt * 6);
+    if (c.count < 3) return;
+    const tier = comboTier(c.count);
+    const color = !tier ? '#ffffff' : tier.at >= 100 ? '#ff7ae0' : tier.at >= 50 ? '#ff7a4a' : tier.at >= 25 ? '#ffb43a' : '#ffe680';
+    const x = 34;
+    const y = SCENE_H * 0.43;
+    const scale = 1 + comboPop * 0.25;
+    if (tier) glow(ctx, x, y, 34, color, 0.25);
+    fx.text(ctx, String(c.count), x, y, 26, color, { scale, color2: '#fff8e0' });
+    fx.text(ctx, tier ? `KOMBO ×${tier.mult}` : 'KOMBO', x, y + 18, 9, '#fff8e0', { sw: 0.3 });
+    blob(ctx, roundRect(x - 20, y + 25, 40, 4, 2), '#2a1b17', { ow: 1, shade: false, noLight: true });
+    flat(ctx, roundRect(x - 19.5, y + 25.5, 39 * Math.max(0, c.timer / COMBO.window), 3, 1.5), color);
+  }
+
+  // Pet ability effects that last a while: the laser beam and the dragon's burn.
+  function petEffects(state, dt) {
+    if (beam && pet && enemy) {
+      beam.t -= dt;
+      if (beam.t <= 0) beam = null;
+      else {
+        const from = pet.out.muzzle ? toScene(pet.out.muzzle.x, pet.out.muzzle.y) : { x: petX() + 14, y: gy - 26 };
+        const to = enemyCenter();
+        const a = beam.t / beam.life;
+        line(ctx, (g) => { g.moveTo(from.x, from.y); g.lineTo(to.x, to.y); }, '#7ff4ff', 9 * a, 0.45);
+        line(ctx, (g) => { g.moveTo(from.x, from.y); g.lineTo(to.x, to.y); }, '#ffffff', 3 * a, 0.95);
+        glow(ctx, to.x, to.y, 26, '#7ff4ff', 0.6 * a);
+      }
+    }
+    if (state.petFx.burn > 0 && enemy && state.enemy.respawn <= 0 && Math.random() < dt * 22) {
+      const c = enemyCenter();
+      const s = enemy.boss ? 1.5 : 1;
+      fx.particle({ x: c.x + (Math.random() * 30 - 15) * s, y: c.y + (Math.random() * 30 - 5) * s, vx: Math.random() * 10 - 5, vy: -40 - Math.random() * 30, g: -20, life: 0.5, size: 2.4 + Math.random() * 2, kind: 'ember', color: Math.random() < 0.5 ? '#ff7a2a' : '#ffd060' });
+    }
+  }
+
+  function petSkill(ev) {
+    if (!pet || !enemy) return;
+    const from = pet.out.muzzle ? toScene(pet.out.muzzle.x, pet.out.muzzle.y) : { x: petX() + 14, y: gy - 26 };
+    const c = enemyCenter();
+    pet.anim.play('attack');
+    if (ev.id === 'bark') {
+      fx.ring(from.x, from.y, 6, 60, '#fff2c0', 0.45, 3);
+      fx.ring(from.x, from.y, 4, 40, '#fff2c0', 0.35, 2);
+      fx.number('HAV!', from.x + 10, from.y - 18, { size: 16, color: '#fff2a0', color2: '#ffb43a', life: 0.8, vy: 24 });
+      enemy.anim.play('hurt', 1);
+    } else if (ev.id === 'laser') {
+      beam = { t: 0.3, life: 0.3 };
+      fx.impact(c.x, c.y, 1.4, '#7ff4ff');
+      enemy.flash = 0.1;
+      if (!reduceMotion) { cam.shake = Math.max(cam.shake, 0.12); cam.mag = Math.max(cam.mag, 2.5); }
+    } else if (ev.id === 'breath') {
+      for (let i = 0; i < 26; i++) {
+        const k = Math.random();
+        const dx = c.x - from.x;
+        const dy = c.y - from.y;
+        fx.particle({ x: from.x, y: from.y, vx: dx * (1.6 + k) + Math.random() * 20 - 10, vy: dy * (1.6 + k) + Math.random() * 30 - 15, g: -30, life: 0.45 + Math.random() * 0.2, size: 3 + Math.random() * 3, kind: 'ember', color: k < 0.5 ? '#ff7a2a' : '#ffd060' });
+      }
+      fx.impact(c.x, c.y, 1, '#ff8a3a');
+    }
+  }
+
   // ---- Events ----
 
   function queue(delay, fn) {
@@ -280,6 +429,20 @@ export function createRenderer(canvas) {
     enemy.anim.play('hurt', ev.crit ? 1 : 0);
     const hx = c.x + (Math.random() * 10 - 5) * s;
     const hy = c.y + (Math.random() * 16 - 8) * s;
+    if (ev.shield) {
+      fx.impact(hx, hy, ev.auto ? 0.5 : 0.9, '#8fd8ff');
+      fx.burst(hx, hy, ['#bff0ff', '#ffffff'], 4, 90);
+      fx.number(formatNumber(ev.dmg), hx, hy - 28 * s, { size: ev.auto ? 11 : 15, color: '#bff0ff', life: 0.7, vy: 36 });
+      if (!ev.auto) hitSound('shield');
+      return;
+    }
+    if (ev.blocked && !ev.auto) {
+      fx.impact(hx, hy, 0.6, '#c8d2dc');
+      fx.number(formatNumber(ev.dmg), hx, hy - 26 * s, { size: 12, color: '#c8d2dc', life: 0.7, vy: 34 });
+      fx.number('TINK', hx + 14, hy - 8, { size: 10, color: '#e8eef4', life: 0.4, vy: 20 });
+      hitSound('blocked');
+      return;
+    }
     if (ev.auto) {
       fx.slash(hx, hy, 44 * s, Math.random() * Math.PI, '#a8f4ff', 0.18, 6);
       fx.impact(hx, hy, 0.5, '#7ff4ff');
@@ -306,7 +469,7 @@ export function createRenderer(canvas) {
     e.anim.play('die');
     dying.push({ e, t: 0, puffed: false });
     enemy = null;
-    dropCoins(c.x, c.y, ev.boss ? 14 : 4);
+    dropCoins(c.x, c.y, ev.boss ? 14 : ev.variant === 'goblin' ? 18 : ev.variant === 'elite' ? 8 : 4);
     fx.number('+' + formatNumber(ev.gold), c.x, c.y - (e.boss ? 70 : 46), { size: 16, color: '#ffe680', color2: '#f0a020', life: 1.2, vy: 26 });
     if (ev.boss) {
       hero.anim.play('cheer');
@@ -326,6 +489,67 @@ export function createRenderer(canvas) {
       }
     } else if (ev.type === 'kill') {
       queue(0, () => kill(ev));
+    } else if (ev.type === 'goblinFlee' || ev.type === 'eliteFlee') {
+      queue(0, () => {
+        if (!enemy) return;
+        const c = enemyCenter();
+        enemy.anim.play('flee');
+        dying.push({ e: enemy, t: 0, puffed: true, flee: true });
+        fx.number(ev.type === 'goblinFlee' ? 'KAÇTI!' : 'GERİ ÇEKİLDİ', c.x, c.y - 40, { size: 15, color: '#ffe680', life: 1.1, vy: 22 });
+        enemy = null;
+      });
+    } else if (ev.type === 'windup') {
+      enemy?.anim.play('windup');
+    } else if (ev.type === 'interrupt') {
+      if (enemy) {
+        const c = enemyCenter();
+        enemy.anim.stop('windup');
+        enemy.anim.play('hurt', 1);
+        enemy.flash = 0.12;
+        fx.impact(c.x, c.y, 2, '#ffe07a');
+        fx.ring(c.x, c.y, 10, 90, '#ffe07a', 0.45, 4);
+        fx.banner('SERSEMLEDİ!', '#b8842a', 1.1);
+        if (!reduceMotion) { cam.shake = 0.2; cam.mag = 4; hitstop = 0.08; }
+      }
+    } else if (ev.type === 'heroHit') {
+      enemy?.anim.stop('windup');
+      enemy?.anim.play('attack');
+      setTimeout(() => {
+        hero.anim.play('hurt');
+        hero.flash = 0.15;
+        const hx = heroX() + hero.anim.pose.x;
+        fx.impact(hx + 10, gy - 50, 1.2, '#ff5a4a');
+        fx.burst(hx + 10, gy - 50, ['#ff5a4a', '#ffffff'], 8, 120);
+        fx.number('-' + formatNumber(ev.dmg), hx + 24, gy - 70, { size: 17, color: '#ff8a7a', color2: '#e0302a', life: 1, vy: 24 });
+        if (!reduceMotion) { cam.shake = 0.22; cam.mag = 4.5; }
+      }, 110);
+    } else if (ev.type === 'heroDown') {
+      setTimeout(() => hero.anim.play('down'), 140);
+    } else if (ev.type === 'shieldBreak') {
+      if (enemy) {
+        const c = enemyCenter();
+        fx.burst(c.x, c.y, ['#bff0ff', '#8fd8ff', '#ffffff'], 22, 220);
+        fx.ring(c.x, c.y, 20, 110, '#bff0ff', 0.5, 4);
+        enemy.anim.play('hurt', 1);
+        if (!reduceMotion) { cam.shake = 0.25; cam.mag = 5; hitstop = 0.1; }
+      }
+    } else if (ev.type === 'petSkill') {
+      petSkill(ev);
+    } else if (ev.type === 'revive') {
+      setTimeout(() => {
+        const hx = heroX() + hero.anim.pose.x;
+        fx.ring(hx, gy - 46, 10, 90, '#ffd060', 0.6, 4);
+        fx.burst(hx, gy - 46, ['#ffd060', '#ff8a3a', '#ffffff'], 24, 180, 'ember');
+        hero.anim.play('cheer');
+      }, 150);
+    } else if (ev.type === 'item' && !ev.salvaged && ev.source === 'boss') {
+      queue(0.3, () => {
+        const c = enemy ? enemyCenter() : { x: enemyX(), y: gy - 40 };
+        fx.number('EŞYA!', c.x, c.y - 60, { size: 16, color: RARITIES[ev.item.rarity].color, color2: '#fff2a0', life: 1.3, vy: 20 });
+      });
+    } else if (ev.type === 'combo') {
+      comboPop = 2;
+      fx.ring(34, SCENE_H * 0.43, 8, 50, '#ffe07a', 0.4, 3);
     } else if (ev.type === 'skill' && ev.id === 'goldRain') {
       api.coinShower(34);
     } else if (ev.type === 'skill') {
@@ -451,7 +675,7 @@ export function createRenderer(canvas) {
       d.t += dt;
       d.e.anim.update(dt, state);
       d.e.flash = Math.max(0, 0.08 - d.t);
-      const a = d.t < 0.18 ? 1 : Math.max(0, 1 - (d.t - 0.18) / 0.14);
+      const a = d.flee ? Math.max(0, 1 - Math.max(0, d.t - 0.5) / 0.3) : d.t < 0.18 ? 1 : Math.max(0, 1 - (d.t - 0.18) / 0.14);
       drawEnemy(d.e, dt, a);
       if (!d.puffed && d.t >= 0.2) {
         d.puffed = true;
@@ -460,13 +684,17 @@ export function createRenderer(canvas) {
         for (let j = 0; j < 7; j++) fx.puff(c.x + (Math.random() * 40 - 20) * s, c.y + (Math.random() * 30 - 12) * s, (10 + Math.random() * 8) * s, '#f4f0ea', 0.55 + Math.random() * 0.2, -16 - Math.random() * 20);
         fx.burst(c.x, c.y, [d.e.look.colors.body, d.e.look.colors.accent], d.e.boss ? 18 : 9, 130);
       }
-      if (d.t > 0.7) dying.splice(i, 1);
+      if (d.t > (d.flee ? 0.85 : 0.7)) dying.splice(i, 1);
     }
     if (enemy && state.enemy.respawn <= 0) drawEnemy(enemy, dt);
+    enemyOverlays(state);
+    petEffects(state, dt);
+    heroBar(state);
     skillAuras(state, dt);
     drawTrail();
     fx.setBannerY(SCENE_H * 0.53);
     fx.draw(ctx, dt, W);
+    comboMeter(state, dt);
     updateCoins(dt);
   }
 
@@ -490,6 +718,7 @@ export function createRenderer(canvas) {
     setCoinTarget(cssX, cssY) { coinTargetCss = { x: cssX, y: cssY }; },
     onCoinArrive(cb) { onCoin = cb; },
     onPetShot(cb) { onPetShot = cb; },
+    onHitSound(cb) { hitSound = cb; },
   };
   return api;
 }

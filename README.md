@@ -29,8 +29,35 @@ The rules are the same as Piksel Savaşçı:
 - The zone changes every 10 stages.
 - Upgrades, pets with eggs and evolutions, the dungeon with companions, five active skills and rebirth for soul stones all work as before.
 
+Progression since v0.4:
+
+- **Ekipman:** weapon, helmet and charm slots, with items in four rarities. Upgrade them with kristal or break them down for it. The worn sword and helmet show on the hero.
+- **Ruh Ağacı:** every rebirth gives soul points for 9 permanent upgrades in three branches.
+- **Zindan:**
+  - the team keeps fighting while the game is closed
+  - team synergies give bonuses by role mix
+  - a chest opens every 10 floors
+- **Pet abilities:** each pet has its own skill that grows with evolution:
+  - the dog barks and stuns
+  - the robot fires a laser
+  - the dragon breathes fire
+  - the phoenix revives the hero once per fight
+
+Combat since v0.3:
+
+- **Combo:** quick taps build a combo; at 10, 25, 50 and 100 hits your taps get stronger.
+- **Boss attacks:** bosses and elites wind up an attack (red "!"). Tap fast to interrupt it, stunning them and dealing extra damage. Otherwise the hero takes the hit.
+- **Health and armor:** Dayanıklılık raises the hero's HP and Demir Zırh reduces damage with diminishing returns. A knocked-out hero loses the boss fight.
+- **Shields:** every 10th boss hides behind a shield that only taps break well.
+- **Special enemies:**
+  - the Hazine Goblini runs off with its gold sack if you don't catch it in time
+  - elites are tougher and attack
+  - armored enemies only take full damage from crits
+- **Görevler:** three daily quests with a bonus chest, plus tiered achievements.
+
 Extras since v0.2, behind the menu button under the version label in the top-right:
 
+- **Görevler:** daily quests and achievements.
 - **Günlük Giriş:** a reward every day on a 7-day streak. The gold grows with progress, and day 7 adds elmas.
 - **Posta:** mails with gifts. New players get their first 100 elmas here.
 - **Lider Tablosu:** coming soon.
@@ -67,5 +94,8 @@ Saves from Piksel Savaşçı don't carry over: the save code import only accepts
 | `js/sound.js` | Sound effects and music (WebAudio) |
 | `js/ui*.js`, `js/main.js`, `js/store.js` | Interface (incl. the menu windows in `ui-windows.js`), game loop and saving |
 | `js/news.js` | Blog announcements |
+| `js/gear.js`, `js/souls.js` | Equipment and soul tree rules |
+| `js/ui-gear.js`, `js/ui-souls.js` | Equipment card and window, soul tree section |
 | `tools/pose-lab.html` | Development view of every actor and its animation frames |
+| `tools/sim.js` | Headless pacing simulation (`node tools/sim.js --help` options in the file header) |
 | `tools/icon-server.js`, `tools/icons.html` | Icon generator (`npm run icons`) |

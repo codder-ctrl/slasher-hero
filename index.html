@@ -43,7 +43,7 @@
 
         <div class="enemy-info">
           <div class="enemy-line"><span id="enemy-name"></span><span id="enemy-progress"></span></div>
-          <div class="bar hp-bar"><div id="hp-fill" class="fill"></div><span id="hp-text"></span></div>
+          <div class="bar hp-bar"><div id="hp-fill" class="fill"></div><div id="shield-fill" class="fill shield"></div><span id="hp-text"></span></div>
           <div id="timer-bar" class="bar timer-bar" hidden><div id="timer-fill" class="fill"></div><span id="timer-text"></span></div>
         </div>
         <button id="auto-btn" class="btn accent" type="button" hidden></button>
@@ -66,6 +66,7 @@
 
       <div id="pages">
         <div class="page" data-tab="hero">
+          <div id="gear-card" class="card gear-card"></div>
           <div id="hero-summary" class="card summary"></div>
           <div id="upgrade-list" class="list"></div>
         </div>
@@ -78,6 +79,7 @@
               <b id="pet-name" class="pet-name"></b>
               <div id="pet-mult" class="item-desc"></div>
               <div id="pet-form" class="item-note"></div>
+              <div id="pet-ability" class="pet-ability"></div>
             </div>
             <button id="pet-evolve" class="buy-btn crystal" type="button"><span id="pet-evolve-label" class="buy-label"></span><span class="buy-cost"><img data-icon="crystal" alt=""><span id="pet-evolve-cost"></span></span></button>
           </div>
@@ -98,6 +100,7 @@
             <span>En iyi <b id="dg-best">0</b></span>
             <span class="wallet"><img data-icon="crystal" alt=""><b id="dg-kristal">0</b></span>
           </div>
+          <div id="dg-synergy" class="synergy-row"></div>
           <div class="dg-stage"><canvas id="dungeon-canvas"></canvas></div>
           <p class="page-hint">Takım kendi kendine savaşır; yenilirse bir kat geri çekilip tekrar dener. Kristalle yoldaş topla ve yükselt.</p>
           <h3 class="section-title">Takım <span id="team-count"></span></h3>
@@ -120,6 +123,10 @@
             <button id="rb-btn" class="btn soul big" type="button">Yeniden Doğ</button>
             <p id="rb-note" class="note"></p>
           </div>
+          <div class="card info">
+            <h3><img data-icon="soul" alt="">Ruh Ağacı</h3>
+            <div id="soul-tree" class="soul-tree"></div>
+          </div>
         </div>
 
       </div>
@@ -136,6 +143,7 @@
     <!-- Top-right menu: a square bubble of shortcuts, each opening a window. -->
     <div id="menu-pop" class="menu-pop" role="menu" hidden>
       <button type="button" role="menuitem" data-window="daily"><img data-icon="daily" alt=""><span>Günlük Giriş</span></button>
+      <button type="button" role="menuitem" data-window="quests"><img data-icon="medal" alt=""><span>Görevler</span></button>
       <button type="button" role="menuitem" data-window="mail"><img data-icon="mail" alt=""><span>Posta</span></button>
       <button type="button" role="menuitem" data-window="leaderboard"><img data-icon="trophy" alt=""><span>Lider Tablosu</span></button>
       <button type="button" role="menuitem" data-window="blog"><img data-icon="scroll" alt=""><span>Blog</span></button>

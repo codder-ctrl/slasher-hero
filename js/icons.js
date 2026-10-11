@@ -144,6 +144,81 @@ function portrait(g, id, look) {
   at(g, 32, def.hover ? 40 : 60, 0, () => def.draw(g, P, look, null), s);
 }
 
+// ---- Hero defense and quests ----
+
+ICONS.heart = (g) => {
+  glow(g, 32, 34, 28, '#ff6a6a', 0.35);
+  blob(g, (c) => { c.moveTo(32, 54); c.bezierCurveTo(10, 40, 6, 24, 14, 16); c.bezierCurveTo(22, 8, 30, 12, 32, 20); c.bezierCurveTo(34, 12, 42, 8, 50, 16); c.bezierCurveTo(58, 24, 54, 40, 32, 54); c.closePath(); }, '#e0413b', { depth: 4, light: '#ff9a8a' });
+  flat(g, ellipse(21, 22, 4, 6, -0.6), '#ffffff', 0.7);
+};
+
+ICONS.shield = (g) => {
+  blob(g, (c) => { c.moveTo(32, 6); c.quadraticCurveTo(44, 12, 54, 12); c.quadraticCurveTo(56, 42, 32, 58); c.quadraticCurveTo(8, 42, 10, 12); c.quadraticCurveTo(20, 12, 32, 6); c.closePath(); }, '#9aa8b8', { depth: 4, light: '#e4ebf2' });
+  blob(g, (c) => { c.moveTo(32, 14); c.quadraticCurveTo(40, 18, 47, 18); c.quadraticCurveTo(48, 40, 32, 50); c.quadraticCurveTo(16, 40, 17, 18); c.quadraticCurveTo(24, 18, 32, 14); c.closePath(); }, '#3b6fd6', { depth: 2.4, ow: 2 });
+  blob(g, star(32, 32, 8, 3.4, 5), GOLD, { ow: 1.6, depth: 1 });
+};
+
+ICONS.medal = (g) => {
+  blob(g, poly([[18, 4], [28, 4], [36, 26], [26, 26]]), '#3b6fd6', { depth: 1.6 });
+  blob(g, poly([[46, 4], [36, 4], [28, 26], [38, 26]]), '#e0413b', { depth: 1.6 });
+  glow(g, 32, 40, 24, '#ffd060', 0.4);
+  blob(g, circle(32, 40, 17), GOLD, { depth: 3, light: '#fff2a8' });
+  line(g, circle(32, 40, 12), '#c88a1a', 2, 0.8);
+  blob(g, star(32, 40.5, 8, 3.4, 5), '#fff2a8', { ow: 1.4, depth: 1 });
+};
+
+// ---- Equipment ----
+
+const ITEM_COLORS = {
+  metal: ['#cdd7e0', '#a8d4f4', '#e8907a', '#ffe48a'],
+  accent: [GOLD, '#3b8ae0', '#c43a4a', '#fff2a8'],
+  glow: [null, '#7fd0ff', '#ff7a3a', '#ffd23a'],
+};
+
+// An item picture: look = { slot, rarity } (rarity -1 draws an empty slot silhouette).
+ICONS.item = (g, look = {}) => {
+  const r = look.rarity ?? 0;
+  const empty = r < 0;
+  const metal = empty ? '#b8a890' : ITEM_COLORS.metal[r];
+  const accent = empty ? '#a89878' : ITEM_COLORS.accent[r];
+  const opts = empty ? { ow: 2, depth: 2, alpha: 0.5 } : { depth: 3 };
+  if (!empty && r > 0) glow(g, 32, 32, 26 + r * 3, ITEM_COLORS.glow[r], 0.3 + r * 0.1);
+  if (look.slot === 'helm') {
+    blob(g, (c) => { c.moveTo(10, 44); c.bezierCurveTo(8, 14, 56, 14, 54, 44); c.lineTo(46, 44); c.lineTo(44, 34); c.lineTo(20, 34); c.lineTo(18, 44); c.closePath(); }, metal, opts);
+    if (!empty) {
+      blob(g, (c) => { c.moveTo(30, 16); c.quadraticCurveTo(22, 2, 6, 6); c.quadraticCurveTo(16, 10, 18, 20); c.closePath(); }, ['#e0413b', '#3b6fd6', '#8a3fc0', '#ffb43a'][r], { depth: 1.6, ow: 2 });
+      line(g, (c) => { c.moveTo(12, 30); c.quadraticCurveTo(32, 16, 52, 30); }, accent, 3);
+      if (r >= 2) blob(g, star(32, 22, 4.4, 2, 4), accent, { ow: 1.4, depth: 0.6 });
+    }
+  } else if (look.slot === 'charm') {
+    line(g, (c) => { c.moveTo(14, 8); c.quadraticCurveTo(32, 30, 50, 8); }, empty ? '#a89878' : '#8a5a32', 2.6);
+    blob(g, (c) => { c.moveTo(32, 18); c.lineTo(48, 34); c.lineTo(32, 56); c.lineTo(16, 34); c.closePath(); }, accent, opts);
+    if (!empty) {
+      blob(g, circle(32, 36, 7.5), ['#5ad05a', '#4ab0ff', '#e0413b', '#ffffff'][r], { ow: 1.8, depth: 1.4, light: '#ffffff' });
+      flat(g, circle(29.5, 33.5, 2), '#ffffff', 0.8);
+    }
+  } else {
+    at(g, 32, 32, -Math.PI / 4, () => {
+      blob(g, poly([[-6, -4.5], [20, -4.5], [29, 0], [20, 4.5], [-6, 4.5]]), metal, opts);
+      if (!empty) line(g, (c) => { c.moveTo(-4, 0); c.lineTo(20, 0); }, darker(metal, 0.25), 1.6);
+      blob(g, roundRect(-10, -12, 5, 24, 2.4), accent, empty ? opts : { depth: 1.4 });
+      blob(g, roundRect(-22, -3.4, 13, 6.8, 3), empty ? '#a89878' : '#7a4a2c', empty ? opts : { depth: 1.2 });
+      blob(g, circle(-24, 0, 4.4), accent, empty ? opts : { depth: 1.2 });
+    });
+  }
+  if (!empty && r >= 3) for (const [x, y] of [[50, 12], [12, 50]]) flat(g, star(x, y, 5, 1.4, 4), '#ffffff', 0.9);
+};
+
+ICONS.chest = (g) => {
+  glow(g, 32, 36, 28, '#ffd060', 0.35);
+  blob(g, roundRect(8, 28, 48, 26, 4), '#a8683a', { depth: 3 });
+  blob(g, (c) => { c.moveTo(8, 30); c.bezierCurveTo(8, 10, 56, 10, 56, 30); c.closePath(); }, '#c07a44', { depth: 3 });
+  blob(g, roundRect(29, 18, 6, 36, 2), GOLD, { depth: 1, ow: 2 });
+  blob(g, roundRect(8, 28, 48, 5, 2), GOLD, { depth: 1, ow: 2 });
+  blob(g, roundRect(27, 30, 10, 10, 2.5), '#e8c050', { depth: 1, ow: 2 });
+  flat(g, circle(32, 35, 1.8), INK);
+};
+
 // ---- Top-right menu ----
 
 ICONS.menuList = (g) => {

@@ -1,8 +1,9 @@
-import { DAILY, MAIL } from './config.js';
+import { DAILY, MAIL, QUEST_BONUS, ACHIEVEMENTS } from './config.js';
 import { CHANGELOG, VERSION } from './changelog.js';
 import { NEWS } from './news.js';
 import * as L from './logic.js';
 import { coverUrl } from './icons.js';
+import { gearView } from './ui-gear.js';
 
 // The top-right menu: a button under the version label opens a square bubble of shortcuts;
 // each opens a parchment window (Günlük Giriş, Posta, Lider Tablosu, Blog, Ayarlar).
@@ -12,6 +13,8 @@ const $ = (id) => document.getElementById(id);
 
 const WINDOWS = {
   daily: { title: 'Günlük Giriş', icon: 'daily' },
+  quests: { title: 'Görevler', icon: 'medal' },
+  gear: { title: 'Ekipman', icon: 'chest' },
   mail: { title: 'Posta', icon: 'mail' },
   leaderboard: { title: 'Lider Tablosu', icon: 'trophy' },
   blog: { title: 'Blog', icon: 'scroll' },
@@ -109,6 +112,133 @@ export function createWindows({ h, icon, make, set, fmt }) {
         set(note, status.canClaim
           ? 'Altın ödülü ulaştığın bölümle birlikte büyür.'
           : `Yeni ödül ${L.formatDuration(untilMidnight(now))} sonra. Bir gün kaçırırsan seri baştan başlar.`);
+      },
+    };
+  }
+
+  // Reward chips: elmas / kristal / gold with their icons.
+  function rewardChips(reward) {
+    const row = make('span', 'reward-chips');
+    for (const [kind, iconName] of [['elmas', 'gem'], ['kristal', 'crystal'], ['gold', 'coinIcon']]) {
+      if (!reward[kind]) continue;
+      const chip = make('span', 'chip small');
+      const img = make('img');
+      img.alt = '';
+      img.src = icon(iconName);
+      chip.append(img, make('b', null, fmt(reward[kind])));
+      row.append(chip);
+    }
+    return row;
+  }
+
+  // One quest or achievement line: title, progress bar, reward and a claim button.
+  function questRow(title, onClaim) {
+    const card = make('div', 'card quest-row');
+    const body = make('div', 'quest-body');
+    const name = make('b', null, title);
+    const bar = make('div', 'quest-bar');
+    const fill = make('div', 'quest-fill');
+    const count = make('span', 'quest-count');
+    bar.append(fill, count);
+    body.append(name, bar);
+    const side = make('div', 'quest-side');
+    const chips = make('span', 'reward-chips');
+    const btn = make('button', 'btn accent small');
+    btn.type = 'button';
+    btn.addEventListener('click', onClaim);
+    side.append(chips, btn);
+    card.append(body, side);
+    let chipKey = '';
+    return {
+      card, name, body, btn,
+      progress(value, target) {
+        fill.style.transform = `scaleX(${Math.min(1, value / target)})`;
+        set(count, `${fmt(Math.min(value, target))} / ${fmt(target)}`);
+      },
+      reward(r) {
+        const key = JSON.stringify(r);
+        if (key !== chipKey) { chipKey = key; chips.replaceChildren(...rewardChips(r).childNodes); }
+      },
+    };
+  }
+
+  function questsView(opts = {}) {
+    const root = make('div', 'window-view');
+    const tabs = make('div', 'seg blog-tabs');
+    const dailyBtn = make('button', null, 'Günlük');
+    const achBtn = make('button', null, 'Başarımlar');
+    for (const b of [dailyBtn, achBtn]) { b.type = 'button'; tabs.append(b); }
+
+    let current = [];
+    const daily = make('div', 'list');
+    const lead = make('p', 'window-lead', 'Her gün 3 yeni görev. Hepsini bitirirsen bonus sandığı senin!');
+    const rows = [0, 1, 2].map((i) => questRow('', () => { if (current[i]) h.claimQuest(current[i].id); }));
+    const bonus = questRow('Bonus sandığı: üç görevin hepsi', () => h.claimQuest('bonus'));
+    bonus.card.classList.add('bonus');
+    bonus.reward(QUEST_BONUS);
+    const reset = make('p', 'note center');
+    daily.append(lead, ...rows.map((r) => r.card), bonus.card, reset);
+
+    const ach = make('div', 'list');
+    const achRows = ACHIEVEMENTS.map((def) => {
+      const r = questRow(def.name, () => h.claimAchievement(def.id));
+      const tiers = make('span', 'ach-tiers');
+      r.name.append(tiers);
+      const sub = make('span', 'note');
+      r.name.after(sub);
+      ach.append(r.card);
+      return { def, r, sub, tiers };
+    });
+
+    function show(which) {
+      dailyBtn.classList.toggle('active', which === 'daily');
+      achBtn.classList.toggle('active', which === 'ach');
+      daily.hidden = which !== 'daily';
+      ach.hidden = which !== 'ach';
+    }
+    dailyBtn.addEventListener('click', () => show('daily'));
+    achBtn.addEventListener('click', () => show('ach'));
+    root.append(tabs, daily, ach);
+    show(opts.tab || 'daily');
+
+    return {
+      root,
+      update(state, now) {
+        current = state.quests.list;
+        current.forEach((q, i) => {
+          const r = rows[i];
+          const st = L.questProgress(state, q);
+          set(r.name, st.def.text.replace('{n}', fmt(st.def.n)));
+          r.progress(st.value, st.def.n);
+          r.reward(st.def.reward);
+          r.btn.disabled = !st.done || st.claimed;
+          set(r.btn, st.claimed ? '✓' : 'Al');
+          r.card.classList.toggle('done', st.claimed);
+          r.card.classList.toggle('ready', st.done && !st.claimed);
+        });
+        const doneCount = current.filter((q) => q.claimed).length;
+        bonus.progress(doneCount, current.length || 3);
+        const bonusReady = L.questBonusReady(state);
+        bonus.btn.disabled = !bonusReady;
+        set(bonus.btn, state.quests.bonus ? '✓' : 'Aç');
+        bonus.card.classList.toggle('done', state.quests.bonus);
+        bonus.card.classList.toggle('ready', bonusReady);
+        const d = new Date(now);
+        d.setHours(24, 0, 0, 0);
+        set(reset, `Yeni görevler ${L.formatDuration((d.getTime() - now) / 1000)} sonra.`);
+
+        for (const { def, r, sub, tiers } of achRows) {
+          const st = L.achievementStatus(state, def);
+          const target = st.next ?? def.tiers[def.tiers.length - 1];
+          set(sub, def.text.replace('{n}', fmt(target)));
+          set(tiers, ' ' + '★'.repeat(st.tier) + '☆'.repeat(def.tiers.length - st.tier));
+          r.progress(st.value, target);
+          r.reward(st.next === null ? {} : { elmas: st.reward });
+          r.btn.disabled = !st.ready;
+          set(r.btn, st.next === null ? '✓' : 'Al');
+          r.card.classList.toggle('done', st.next === null);
+          r.card.classList.toggle('ready', st.ready);
+        }
       },
     };
   }
@@ -255,7 +385,7 @@ export function createWindows({ h, icon, make, set, fmt }) {
     return { root: el.settings, update() {} };
   }
 
-  const builders = { daily: dailyView, mail: mailView, leaderboard: leaderboardView, blog: blogView, settings: settingsView };
+  const builders = { gear: (opts) => gearView({ h, icon, make, set, fmt }, opts), daily: dailyView, quests: questsView, mail: mailView, leaderboard: leaderboardView, blog: blogView, settings: settingsView };
 
   function open(name, opts) {
     setPop(false);
@@ -282,6 +412,7 @@ export function createWindows({ h, icon, make, set, fmt }) {
     const unseenNews = NEWS.some((n) => !state.seen.news.includes(n.id));
     const flags = {
       daily: L.dailyStatus(state, now).canClaim,
+      quests: L.questsClaimable(state),
       mail: L.unreadMail(state) > 0,
       blog: state.seen.version !== VERSION || unseenNews,
       leaderboard: false,

@@ -1,10 +1,15 @@
-import { AUTOSAVE_MS, OFFLINE_MIN, OFFLINE_CAP, SKILLS } from './config.js';
+import { AUTOSAVE_MS, OFFLINE_MIN, OFFLINE_CAP, SKILLS, COMBO, RARITIES } from './config.js';
+
+const COMBO_TIERS = COMBO.tiers;
+const comboTierAt = (count) => L.comboTier(count)?.at;
 import * as L from './logic.js';
 import * as store from './store.js';
 import { createRenderer } from './render.js';
 import { createUI } from './ui.js';
 import { createDungeonView } from './dungeon-view.js';
 import * as D from './dungeon.js';
+import * as G from './gear.js';
+import * as T from './souls.js';
 import { VERSION } from './changelog.js';
 import { NEWS } from './news.js';
 import { sfx, unlockAudio, setSoundEnabled, setMusicEnabled, setMusicMood, pauseAudio } from './sound.js';
@@ -31,7 +36,13 @@ function dispatch(events) {
       // The dungeon is only drawn while its tab is open.
       if (ui.tab === 'dungeon') dungeonView.handle(ev, state);
       if (ev.type === 'dg-clear' && ev.elmas) ui.toast(`Zindan bossu: +${ev.elmas} elmas`);
+      if (ev.type === 'dg-chest') sfx.chest();
       continue;
+    }
+    if (ev.type === 'item') {
+      const r = RARITIES[ev.item.rarity];
+      ui.toast(ev.salvaged ? `Çanta dolu: ${G.itemName(ev.item)} → +${ev.salvaged} kristal` : `Yeni eşya: ${G.itemName(ev.item)} (${r.name})`);
+      if (!ev.salvaged) sfx.item(ev.item.rarity);
     }
     renderer.handle(ev, state);
     switch (ev.type) {
@@ -55,16 +66,55 @@ function dispatch(events) {
         break;
       case 'bossFail':
         sfx.fail();
-        renderer.showBanner('SÜRE DOLDU!', '#c0503a');
+        renderer.showBanner(ev.down ? 'BAYILDIN!' : 'SÜRE DOLDU!', '#c0503a');
         updateMusic();
         break;
       case 'spawn':
       case 'stage':
         if (state.enemy.respawn <= 0 && state.enemy.boss) {
           sfx.boss();
-          renderer.showBanner('BOSS!', '#c8353a', 1.2);
+          renderer.showBanner(state.enemy.shield > 0 ? 'KALKANLI BOSS!' : 'BOSS!', '#c8353a', 1.2);
+        } else if (state.enemy.respawn <= 0 && state.enemy.variant === 'goblin') {
+          sfx.goblin();
+          renderer.showBanner('HAZİNE GOBLİNİ!', '#3f9a45', 1.3);
+        } else if (state.enemy.respawn <= 0 && state.enemy.variant === 'elite') {
+          renderer.showBanner('ELİT DÜŞMAN!', '#c8871a', 1.1);
         }
         updateMusic();
+        break;
+      case 'combo':
+        sfx.combo(COMBO_TIERS.findIndex((t) => t.at === comboTierAt(ev.count)));
+        break;
+      case 'windup':
+        sfx.windup();
+        break;
+      case 'interrupt':
+        sfx.interrupt();
+        break;
+      case 'heroHit':
+        sfx.heroHit();
+        break;
+      case 'heroDown':
+        sfx.heroDown();
+        if (!ev.boss) renderer.showBanner('BAYILDIN!', '#8a2a3a', 1.4);
+        break;
+      case 'shieldBreak':
+        sfx.shieldBreak();
+        renderer.showBanner('KALKAN KIRILDI!', '#2a6fc0', 1.3);
+        break;
+      case 'goblinFlee':
+        sfx.goblinFlee();
+        break;
+      case 'petSkill':
+        sfx.petSkill(ev.id);
+        break;
+      case 'revive':
+        sfx.revive();
+        renderer.showBanner('KÜLLERİNDEN DOĞUŞ!', '#e07a1a', 1.4);
+        break;
+      case 'quest':
+      case 'achievement':
+        sfx.quest();
         break;
     }
   }
@@ -130,6 +180,44 @@ const ui = createUI({
     sfx.win();
     renderer.coinShower(12 + reward.day * 4);
     ui.toast(reward.elmas ? `+${L.formatNumber(reward.gold)} altın, +${reward.elmas} elmas` : `+${L.formatNumber(reward.gold)} altın`);
+    store.save(state);
+    ui.refresh();
+  },
+  equipItem(uid) {
+    if (G.equip(state, uid)) { sfx.buy(); ui.refresh(); }
+  },
+  upgradeItem(uid) {
+    if (G.upgradeItem(state, uid)) { sfx.buy(); ui.refresh(); }
+  },
+  salvageItem(uid) {
+    const k = G.salvage(state, uid);
+    if (k) { sfx.coin(); ui.toast(`+${k} kristal`); ui.refresh(); }
+  },
+  openChest() {
+    const events = [];
+    if (G.openChest(state, Math.random, events)) { unlockAudio(); sfx.chest(); dispatch(events); store.save(state); ui.refresh(); }
+  },
+  buyNode(id) {
+    if (T.buyNode(state, id)) { sfx.skill('focus'); ui.refresh(); }
+  },
+  toast: (msg) => ui.toast(msg),
+  claimQuest(id) {
+    const events = [];
+    const reward = id === 'bonus' ? L.claimQuestBonus(state, events) : L.claimQuest(state, id, events);
+    if (!reward) return;
+    unlockAudio();
+    dispatch(events);
+    ui.toast(rewardText(reward));
+    store.save(state);
+    ui.refresh();
+  },
+  claimAchievement(id) {
+    const events = [];
+    const reward = L.claimAchievement(state, id, events);
+    if (!reward) return;
+    unlockAudio();
+    dispatch(events);
+    ui.toast(rewardText(reward));
     store.save(state);
     ui.refresh();
   },
@@ -273,6 +361,14 @@ const ui = createUI({
   },
 });
 
+function rewardText(r) {
+  const parts = [];
+  if (r.elmas) parts.push(`+${r.elmas} elmas`);
+  if (r.kristal) parts.push(`+${r.kristal} kristal`);
+  if (r.gold) parts.push(`+${L.formatNumber(r.gold)} altın`);
+  return parts.join(', ');
+}
+
 // ---- Time away ----
 
 // Short gaps (tab switched, screen locked briefly) are simulated tick by tick; longer ones
@@ -280,12 +376,15 @@ const ui = createUI({
 function catchUp(seconds) {
   if (seconds >= OFFLINE_MIN) {
     const gold = L.applyOffline(state, seconds);
-    if (gold > 0) {
-      ui.openModal({
-        title: 'Tekrar hoş geldin!',
-        body: `Sen yokken (${L.formatDuration(Math.min(seconds, OFFLINE_CAP))}) petin ${L.formatNumber(gold)} altın topladı.`,
-        actions: [{ label: 'Harika!', kind: 'accent' }],
-      });
+    const dg = D.offlineDungeon(state, seconds);
+    if (gold > 0 || dg.kristal > 0) {
+      const body = [`Sen yokken (${L.formatDuration(Math.min(seconds, OFFLINE_CAP))}):`];
+      if (gold > 0) body.push(`Petin ${L.formatNumber(gold)} altın topladı.`);
+      if (dg.kristal > 0) {
+        const extra = [dg.floors > 0 ? `${dg.floors} yeni kat` : '', dg.elmas ? `${dg.elmas} elmas` : '', dg.items ? `${dg.items} eşya` : ''].filter(Boolean).join(', ');
+        body.push(`Zindan takımın ${L.formatNumber(dg.kristal)} kristal kazandı${extra ? ` (${extra})` : ''}.`);
+      }
+      ui.openModal({ title: 'Tekrar hoş geldin!', body, actions: [{ label: 'Harika!', kind: 'accent' }] });
     }
   } else if (seconds > 0.5) {
     for (let t = 0; t < seconds; t += 0.25) L.tick(state, 0.25);
@@ -349,6 +448,7 @@ renderer.onCoinArrive(() => {
   ui.pulseGold();
 });
 renderer.onPetShot((kind) => sfx.petShot(kind));
+renderer.onHitSound((kind) => (kind === 'shield' ? sfx.shieldHit() : sfx.blocked()));
 updateMusic();
 
 function layout() {
@@ -375,16 +475,23 @@ if ('serviceWorker' in navigator) {
 // Ask the browser not to evict the save when storage runs low.
 navigator.storage?.persist?.().catch(() => {});
 
-// ---- Loop ----
 
 let last = performance.now();
+let questCheck = 0;
 function loop(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   dispatch(L.tick(state, dt, Math.random, []));
+  if ((questCheck -= dt) <= 0) { questCheck = 5; if (L.ensureQuests(state)) ui.refresh(); }
   renderer.frame(state, dt);
   if (ui.tab === 'dungeon') dungeonView.frame(state, dt);
   ui.update(state, now);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// Local development only: lets browser tests read and poke the live state, and restart the
+// loop after swapping in a requestAnimationFrame stub (hidden panes don't fire it).
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  window.slasher = { get state() { return state; }, L, D, G, T, dispatch, kick: () => requestAnimationFrame(loop) };
+}

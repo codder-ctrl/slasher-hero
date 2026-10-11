@@ -1,4 +1,11 @@
 import { PETS, RARITIES, PET_TRAINING, EGG_COST, MAX_STARS, FORM_MULT } from './config.js';
+
+// A pet ability's text with its numbers filled in for the current form.
+export function abilityText(ab) {
+  const pct = ['keen', 'scan', 'revive'].includes(ab.id);
+  const power = pct ? Math.round(ab.power * 100) : Math.round(ab.power * 10) / 10;
+  return ab.text.replace('{every}', ab.every).replace('{burn}', ab.burn).replace('{power}', power);
+}
 import * as L from './logic.js';
 
 // The Pet tab: the active pet with its evolution, Pet Eğitimi (gold), eggs (elmas) and the
@@ -12,6 +19,7 @@ export function createPetPage({ h, icon, make, set, makeCard, fmt }) {
     mult: $('pet-mult'), form: $('pet-form'), evolve: $('pet-evolve'), evolveLabel: $('pet-evolve-label'),
     evolveCost: $('pet-evolve-cost'), elmas: $('elmas'), kristal: $('pet-kristal'), egg: $('egg-btn'),
     rates: $('egg-rates'), grid: $('pet-grid'), count: $('pet-count'), training: $('pet-training'),
+    ability: $('pet-ability'),
   };
 
   const petIcon = (pet, form) => icon('actor:' + pet.actor, { colors: pet.forms[form - 1].colors, form });
@@ -53,6 +61,8 @@ export function createPetPage({ h, icon, make, set, makeCard, fmt }) {
     set(el.stars, starText(owned.stars));
     set(el.mult, `Hasar çarpanı ×${fmt(L.petMultiplier(state, pet.id))}`);
     set(el.form, `Evrim ${owned.form}/${FORM_MULT.length}`);
+    const ab = L.petAbility(state);
+    set(el.ability, ab ? `${ab.name}: ${abilityText(ab)}` : '');
     const cost = L.evolveCost(state, pet.id);
     const maxed = cost === Infinity;
     set(el.evolveLabel, maxed ? 'Son form' : `Evrim → ${pet.forms[owned.form].name}`);

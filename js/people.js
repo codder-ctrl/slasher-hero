@@ -50,6 +50,17 @@ function arm(ctx, x, y, shoulder, elbow, sleeve, glove, hand, len = 9.5, r = 3.9
 
 // ---- Hero ----
 
+// Equipment looks by item rarity (look.weapon / look.helm; -1 or missing = starting gear).
+const GEAR_LOOK = {
+  blade: ['#e9eff5', '#cdebff', '#ffc8a8', '#fff2b0'],
+  bladeGlow: [null, '#7fd0ff', '#ff7a3a', '#ffd23a'],
+  guard: [GOLD, '#4aa8f0', '#c43a4a', '#fff2a8'],
+  helm: ['#cdd7e0', '#a8c8e8', '#d8786a', '#ffe48a'],
+  helmTrim: [GOLD, '#3b6fd6', '#7a2040', '#ff9a3a'],
+  plume: ['#e0413b', '#3b6fd6', '#8a3fc0', '#ffb43a'],
+};
+const gearColor = (key, r, fallback) => (r >= 0 ? GEAR_LOOK[key][r] : fallback);
+
 function sword(ctx, P, out, look) {
   at(ctx, 0, 0, P.sword, () => {
     // Grip, pommel and crossguard.
@@ -57,11 +68,14 @@ function sword(ctx, P, out, look) {
     blob(ctx, circle(-10, 0, 3.2), GOLD, { depth: 1.2 });
     // Blade with a fuller and a bright edge.
     const blade = poly([[5, -3.6], [42, -3.2], [52, 0], [42, 3.2], [5, 3.6]]);
+    const w = look.weapon ?? -1;
     if (look.rage) glow(ctx, 30, 0, 26, '#ff5a2a', 0.45);
-    blob(ctx, blade, look.rage ? '#ffd2b8' : '#e9eff5', { depth: 1.8, ow: 2.2 });
+    else if (w > 0) glow(ctx, 30, 0, 18 + w * 4, GEAR_LOOK.bladeGlow[w], 0.25 + w * 0.08);
+    blob(ctx, blade, look.rage ? '#ffd2b8' : gearColor('blade', w, '#e9eff5'), { depth: 1.8, ow: 2.2 });
     line(ctx, (c) => { c.moveTo(8, 0); c.lineTo(40, 0); }, '#a9b6c4', 1.6);
     line(ctx, (c) => { c.moveTo(7, -2.2); c.lineTo(42, -2); }, '#ffffff', 1.1, 0.9);
-    blob(ctx, roundRect(2, -8, 4.6, 16, 2.2), GOLD, { depth: 1.4 });
+    blob(ctx, roundRect(2, -8, 4.6, 16, 2.2), gearColor('guard', w, GOLD), { depth: 1.4 });
+    if (w >= 3) for (const y of [-9, 9]) flat(ctx, star(4.3, y, 3, 1.2, 4, P.sword), '#ffffff');
     blob(ctx, circle(4.3, 0, 1.9), '#d23c3c', { ow: 1.2, depth: 0.6 });
     mark(ctx, out, 'tip', 52, 0);
     mark(ctx, out, 'base', 12, 0);
@@ -73,8 +87,9 @@ function sword(ctx, P, out, look) {
 function heroHead(ctx, P, look) {
   // Plume sweeps back from the crest.
   at(ctx, 1, -18, P.plume * 0.12, () => {
-    blob(ctx, smooth([[0, 0], [-6, -9], [-17, -12 - P.plume * 1.5], [-29, -8 - P.plume * 3], [-24, -3], [-14, -1], [-6, 3]]), '#e0413b', { depth: 2.6 });
-    line(ctx, (c) => { c.moveTo(-5, -4); c.quadraticCurveTo(-15, -8, -24, -6 - P.plume * 2.4); }, darker('#e0413b', 0.45), 1.6);
+    const plume = gearColor('plume', look.helm ?? -1, '#e0413b');
+    blob(ctx, smooth([[0, 0], [-6, -9], [-17, -12 - P.plume * 1.5], [-29, -8 - P.plume * 3], [-24, -3], [-14, -1], [-6, 3]]), plume, { depth: 2.6 });
+    line(ctx, (c) => { c.moveTo(-5, -4); c.quadraticCurveTo(-15, -8, -24, -6 - P.plume * 2.4); }, darker(plume, 0.45), 1.6);
   });
   // Face.
   blob(ctx, circle(0, 0, 15.5), SKIN, { depth: 3 });
@@ -82,8 +97,10 @@ function heroHead(ctx, P, look) {
   flat(ctx, ellipse(9, 7.5, 3.4, 2.2), '#f29a8a', 0.55);
   // Helmet: dome over the top and back with an open face.
   const helm = smooth([[-17.5, 7], [-18, -6], [-11, -16.5], [1, -19], [12.5, -14], [17.5, -5], [16.2, -1.5], [7, -3.6], [-2.5, -2], [-6.5, 8.5], [-13, 11]], 0.95);
-  blob(ctx, helm, STEEL, { depth: 3.4 });
-  line(ctx, (c) => { c.moveTo(-15, -9); c.quadraticCurveTo(-1, -21, 14, -9); }, GOLD, 2.6);
+  const h = look.helm ?? -1;
+  blob(ctx, helm, gearColor('helm', h, STEEL), { depth: 3.4 });
+  line(ctx, (c) => { c.moveTo(-15, -9); c.quadraticCurveTo(-1, -21, 14, -9); }, gearColor('helmTrim', h, GOLD), 2.6);
+  if (h >= 2) blob(ctx, star(1, -18.5, 3.4, 1.5, 4), gearColor('helmTrim', h, GOLD), { ow: 1.4, depth: 0.6 });
   flat(ctx, circle(-12, 3, 1.4), '#7e8a99');
   flat(ctx, circle(-9, -9.5, 1.4), '#7e8a99');
   // Eye, brow and mouth.
@@ -196,6 +213,28 @@ export const hero = {
   },
   actions: {
     attack: { dur: 0.26, channel: 'body', pose: heroAttack },
+    hurt: {
+      dur: 0.35, channel: 'hurt',
+      pose: (p) => ({
+        x: track(p, [[0, 0], [0.15, -9, 'out'], [1, 0]]),
+        lean: track(p, [[0, 0], [0.15, -0.22, 'out'], [1, 0]]),
+        sq: track(p, [[0, 0], [0.12, -0.1], [0.4, 0.04], [1, 0]]),
+        head: track(p, [[0, 0], [0.15, -0.25], [1, 0]]),
+        blink: bump(p, 0.05, 0.6),
+        mouth: bump(p, 0.1, 0.6),
+      }),
+    },
+    // Knocked flat, then back on the feet.
+    down: {
+      dur: 1.5, channel: 'down',
+      pose: (p) => ({
+        lean: track(p, [[0, 0], [0.2, -1.35, 'outCubic'], [0.7, -1.35], [1, 0, 'inOut']]),
+        x: track(p, [[0, 0], [0.2, -16, 'out'], [0.7, -16], [1, 0]]),
+        y: track(p, [[0, 0], [0.2, 4], [0.7, 4], [1, 0]]),
+        blink: track(p, [[0, 0], [0.15, 1], [0.7, 1], [0.8, 0]]),
+        armF: track(p, [[0, 0], [0.2, 1.2], [0.7, 1.2], [1, 0]]),
+      }),
+    },
     cheer: {
       dur: 1.1, channel: 'body',
       pose: (p) => ({

@@ -6,7 +6,7 @@ import { createAnimator } from '../js/anim.js';
 import { ICONS } from '../js/icons.js';
 import { paintBackdrop, paintDungeon, createWeather, THEME_IDS } from '../js/scenery.js';
 import { createFx } from '../js/fx.js';
-import { UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES, MAIL } from '../js/config.js';
+import { UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES, MAIL, SPECIALS } from '../js/config.js';
 import { NEWS } from '../js/news.js';
 import { existsSync } from 'node:fs';
 
@@ -36,7 +36,10 @@ function looksFor(id) {
   for (const e of DUNGEON.enemies) if (e.actor === id) looks.push({ colors: e.colors });
   for (const p of PETS) if (p.actor === id) p.forms.forEach((f, i) => looks.push({ colors: f.colors, form: i + 1 }));
   for (const c of COMPANIONS) if (c.actor === id) looks.push({ colors: c.colors, role: c.role, shotColor: c.shotColor });
-  if (id === 'hero') looks.push({}, { rage: true });
+  if (id === 'hero') looks.push({}, { rage: true }, { weapon: 3, helm: 3 }, { weapon: 1, helm: 2 });
+  if (id === SPECIALS.goblin.actor) looks.push({ colors: SPECIALS.goblin.colors });
+  // Ordinary enemies can also turn up armored or elite.
+  if (looks[0]?.colors?.body && !looks[0].form && looks[0].role === undefined && id !== 'goblin') looks.push({ ...looks[0], armored: true }, { ...looks[0], elite: true });
   return looks;
 }
 
@@ -163,6 +166,7 @@ test('icons draw with finite coordinates', () => {
     if (name.startsWith('tab')) continue;
     const ctx = mockContext();
     draw(ctx);
+    if (name === 'item') for (const slot of ['weapon', 'helm', 'charm']) for (const rarity of [-1, 0, 1, 2, 3]) draw(ctx, { slot, rarity });
     assert.ok(ctx.numbers.length > 4 && ctx.numbers.every(Number.isFinite), name);
   }
 });

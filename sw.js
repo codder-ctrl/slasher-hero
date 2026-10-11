@@ -18,6 +18,7 @@ const SHELL = [
   'js/dungeon.js',
   'js/dungeon-view.js',
   'js/fx.js',
+  'js/gear.js',
   'js/icons.js',
   'js/logic.js',
   'js/main.js',
@@ -27,11 +28,14 @@ const SHELL = [
   'js/pets.js',
   'js/render.js',
   'js/scenery.js',
+  'js/souls.js',
   'js/sound.js',
   'js/store.js',
   'js/ui.js',
   'js/ui-dungeon.js',
+  'js/ui-gear.js',
   'js/ui-pets.js',
+  'js/ui-souls.js',
   'js/ui-windows.js',
   'js/news.js',
   'icons/icon-192.png',
@@ -52,7 +56,9 @@ self.addEventListener('activate', (event) => {
 async function networkFirst(request) {
   const cache = await caches.open(CACHE);
   try {
-    const response = await fetch(request);
+    // 'no-cache' revalidates with the server, so the browser's HTTP cache (GitHub Pages allows
+    // 10 minutes) can't hand out an old module next to new ones right after a deploy.
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch (err) {

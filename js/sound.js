@@ -222,6 +222,94 @@ export const sfx = {
     [1047, 1319, 1568, 2093, 2637].forEach((f, i) => tone(f, 0.35, { vol: 0.06, delay: i * 0.07, wet: 0.6 }));
     noise(0.6, { vol: 0.05, type: 'highpass', f0: 6000, attack: 0.2 });
   },
+  // An enemy rearing up to strike: a rising growl and a warning bell.
+  windup() {
+    if (!ready()) return;
+    tone(90, 1.2, { type: 'sawtooth', vol: 0.12, slide: 2.2, lp: 900, attack: 0.2 });
+    tone(880, 0.12, { type: 'square', vol: 0.05 });
+    tone(880, 0.12, { type: 'square', vol: 0.05, delay: 0.18 });
+  },
+  interrupt() {
+    if (!ready()) return;
+    ring(1046, 0.7, 0.09);
+    tone(220, 0.25, { slide: 0.5, vol: 0.3 });
+    noise(0.15, { vol: 0.2, f0: 2500, q: 1.2 });
+    [1319, 1568, 2093].forEach((f, i) => tone(f, 0.18, { type: 'triangle', vol: 0.05, delay: 0.08 + i * 0.06, wet: 0.4 }));
+  },
+  heroHit() {
+    if (!ready()) return;
+    tone(95, 0.3, { slide: 0.45, vol: 0.5, delay: 0.1 });
+    noise(0.2, { vol: 0.25, type: 'lowpass', f0: 1400, f1: 300, delay: 0.1 });
+    tone(260, 0.18, { type: 'triangle', vol: 0.08, slide: 0.7, delay: 0.14 });
+  },
+  heroDown() {
+    if (!ready()) return;
+    [330, 262, 196, 131].forEach((f, i) => tone(f, 0.4, { type: 'triangle', vol: 0.12, delay: 0.15 + i * 0.16, slide: 0.95, wet: 0.4 }));
+  },
+  shieldHit() {
+    if (!ready() || !limited('shield', 60)) return;
+    tone(rnd(1800, 2200), 0.12, { vol: 0.05, wet: 0.3 });
+    noise(0.05, { vol: 0.08, type: 'highpass', f0: 5000 });
+  },
+  shieldBreak() {
+    if (!ready()) return;
+    noise(0.6, { vol: 0.3, type: 'highpass', f0: 3000, f1: 1200, wet: 0.5 });
+    for (let i = 0; i < 6; i++) tone(rnd(1500, 3200), 0.25, { vol: 0.04, delay: i * 0.04, wet: 0.5 });
+    tone(140, 0.3, { slide: 0.5, vol: 0.3 });
+  },
+  blocked() {
+    if (!ready() || !limited('blocked', 60)) return;
+    ring(rnd(2400, 2900), 0.25, 0.05, 0.07);
+  },
+  combo(level) {
+    if (!ready()) return;
+    const base = [784, 880, 988, 1175][Math.min(3, level)];
+    [1, 1.25, 1.5].forEach((r, i) => tone(base * r, 0.16, { type: 'triangle', vol: 0.07, delay: i * 0.05, wet: 0.4 }));
+  },
+  goblin() {
+    if (!ready()) return;
+    [988, 1175, 988, 1319].forEach((f, i) => tone(f, 0.07, { type: 'square', vol: 0.03, delay: i * 0.07 }));
+  },
+  goblinFlee() {
+    if (!ready()) return;
+    [1319, 1175, 988, 784].forEach((f, i) => tone(f, 0.07, { type: 'square', vol: 0.03, delay: i * 0.06 }));
+    noise(0.3, { vol: 0.08, f0: 800, f1: 3000, q: 1.4 });
+  },
+  quest() {
+    if (!ready()) return;
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.2, { type: 'triangle', vol: 0.09, delay: i * 0.06, wet: 0.4 }));
+  },
+  chest() {
+    if (!ready()) return;
+    tone(180, 0.15, { type: 'triangle', vol: 0.15, slide: 1.5 });
+    noise(0.12, { vol: 0.1, f0: 900, q: 1.5, delay: 0.05 });
+    [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.22, { vol: 0.06, delay: 0.12 + i * 0.06, wet: 0.5 }));
+  },
+  // A new item: brighter and longer the rarer it is.
+  item(rarity = 0) {
+    if (!ready()) return;
+    const notes = [[659, 988], [659, 988, 1319], [784, 1175, 1568, 1976], [784, 1175, 1568, 2093, 2637]][rarity] || [659, 988];
+    notes.forEach((f, i) => tone(f, 0.25 + rarity * 0.08, { type: 'triangle', vol: 0.07, delay: i * 0.07, wet: 0.5 }));
+    if (rarity >= 2) noise(0.6, { vol: 0.05, type: 'highpass', f0: 6000, attack: 0.15, wet: 0.5 });
+  },
+  petSkill(id) {
+    if (!ready()) return;
+    if (id === 'bark') {
+      tone(420, 0.09, { type: 'sawtooth', vol: 0.08, slide: 0.6, lp: 1600 });
+      tone(380, 0.11, { type: 'sawtooth', vol: 0.08, slide: 0.6, lp: 1600, delay: 0.14 });
+    } else if (id === 'laser') {
+      tone(1800, 0.3, { type: 'square', vol: 0.04, slide: 0.3, lp: 4000 });
+      tone(900, 0.3, { type: 'sawtooth', vol: 0.03, slide: 0.5 });
+    } else if (id === 'breath') {
+      noise(0.7, { vol: 0.16, type: 'bandpass', f0: 600, f1: 300, q: 0.7, attack: 0.08 });
+      tone(110, 0.6, { type: 'sawtooth', vol: 0.06, lp: 500 });
+    }
+  },
+  revive() {
+    if (!ready()) return;
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.3, { type: 'triangle', vol: 0.08, delay: i * 0.05, wet: 0.6 }));
+    noise(0.5, { vol: 0.1, f0: 500, f1: 3000, q: 1, attack: 0.1 });
+  },
   petShot(kind) {
     if (!ready() || !limited('pet', 120)) return;
     if (kind === 'arrow') tone(rnd(330, 380), 0.12, { type: 'triangle', vol: 0.06, slide: 0.6 });

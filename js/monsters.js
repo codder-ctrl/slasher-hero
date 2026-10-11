@@ -19,6 +19,21 @@ export function crown(ctx, x, y, rot = 0, s = 1) {
   }, s);
 }
 
+// An iron helmet for armored enemies (drawn where a boss wears its crown).
+export function helmet(ctx, x, y, rot = 0, s = 1) {
+  at(ctx, x, y + 6, rot, () => {
+    blob(ctx, (c) => { c.moveTo(-13, 2); c.bezierCurveTo(-13, -16, 13, -16, 13, 2); c.closePath(); }, '#8f9cab', { depth: 2.4, light: '#dfe6ee' });
+    blob(ctx, roundRect(-15, -1, 30, 5, 2.4), '#6f7b8a', { depth: 1, ow: 1.8 });
+    blob(ctx, roundRect(-2, -15, 4, 14, 2), '#c8d2dc', { depth: 0.8, ow: 1.6 });
+    for (const rx of [-9, 0, 9]) flat(ctx, circle(rx, 1.5, 1.1), '#4a5462');
+  }, s);
+}
+
+function headgear(ctx, look, x, y, rot, s = 1) {
+  if (look.boss) crown(ctx, x, y, rot, s);
+  else if (look.armored) helmet(ctx, x, y, rot, s);
+}
+
 const REST = { x: 0, y: 0, lean: 0, sq: 1, blink: 0, wob: 0, wing: 0, jaw: 0, arm: 0, mouth: 0, alpha: 1 };
 
 const hurt = {
@@ -69,7 +84,29 @@ const attack = {
   }),
 };
 
-const baseActions = { hurt, die, enter, attack };
+// Rearing back before a strike; held until the attack lands or is interrupted.
+const windup = {
+  dur: 1.4, hold: true, channel: 'body',
+  pose: (p) => ({
+    x: track(p, [[0, 0], [0.25, -9, 'out']]),
+    lean: track(p, [[0, 0], [0.25, -0.28, 'out']]) + Math.sin(p * 40) * 0.03,
+    sq: track(p, [[0, 0], [0.25, 0.1, 'out']]),
+    mouth: 1,
+  }),
+};
+
+// Running off the right edge (local -x after the mirror) for fleeing goblins and elites.
+const flee = {
+  dur: 0.7, hold: true, channel: 'die',
+  pose: (p) => ({
+    x: track(p, [[0, 0], [0.15, 6], [1, -160, 'in']]),
+    y: -Math.abs(Math.sin(p * Math.PI * 5)) * 8,
+    lean: -0.2,
+    mouth: 1,
+  }),
+};
+
+const baseActions = { hurt, die, enter, attack, windup, flee };
 
 function squash(ctx, P, fn) {
   at(ctx, P.x, P.y, 0, () => at(ctx, 0, 0, P.lean, fn, 2 - P.sq, P.sq));
@@ -113,7 +150,7 @@ export const slime = {
       eye(ctx, 6, -20, 5.4, { lx: 0.7, blink: P.blink, angry: look.boss ? 0.9 : 0.25 });
       eye(ctx, 17.5, -19, 4.6, { lx: 0.7, blink: P.blink, angry: look.boss ? 0.9 : 0.25 });
       mouthShape(ctx, 13, -9, 9, P.mouth, false);
-      if (look.boss) crown(ctx, 0, -35, 0.08);
+      headgear(ctx, look, 0, -35, 0.08);
     });
   },
 };
@@ -164,7 +201,7 @@ export const bat = {
       eye(ctx, 11, -5.5, 3.6, { lx: 0.7, blink: P.blink, angry: look.boss ? 1 : 0.7, pupil: '#2a0a12' });
       mouthShape(ctx, 8, 2.5, 8, P.mouth, true);
       batWing(ctx, P, body, accent, false);
-      if (look.boss) crown(ctx, 1, -18, 0.05, 0.8);
+      headgear(ctx, look, 1, -18, 0.05, 0.8);
     });
   },
 };
@@ -203,7 +240,7 @@ export const mushroom = {
         flat(ctx, ellipse(15, -8, 4.4, 3.4, 0.3), lighter(accent, 0.3), 0.95);
         flat(ctx, ellipse(-19, -3, 2.6, 2), lighter(accent, 0.3), 0.95);
         line(ctx, (c) => { c.moveTo(-24, 1.5); c.quadraticCurveTo(0, 6, 25, 1.5); }, darker(body, 0.35), 2);
-        if (look.boss) crown(ctx, 2, -24, 0.1);
+        headgear(ctx, look, 2, -24, 0.1);
       });
     });
   },
@@ -257,7 +294,7 @@ export const skeleton = {
         flat(ctx, circle(2, -10.5, 1.8), accent, lit);
         flat(ctx, circle(10.6, -9.6, 1.5), accent, lit);
         flat(ctx, poly([[6, -6], [4.6, -3.6], [7.4, -3.6]]), '#231a26');
-        if (look.boss) crown(ctx, 1, -21, 0.12, 0.9);
+        headgear(ctx, look, 1, -21, 0.12, 0.9);
       });
       // Front arm with a rusty blade.
       at(ctx, 5, -42, -0.5 + P.arm, () => {
@@ -317,7 +354,58 @@ export const ghost = {
       flat(ctx, circle(12.3, -24, 1.4), accent, open);
       blob(ctx, ellipse(8, -12, 3 + P.mouth * 1.5, 3.6 + P.mouth * 2.5), '#1e1430', { ow: 1.4, shade: false, noLight: true });
       at(ctx, 17, -14, -0.6 - P.arm, () => blob(ctx, ellipse(0, 5, 4, 7), body, { depth: 1.2, alpha: 0.9 }));
-      if (look.boss) crown(ctx, 0, -38, 0.1);
+      headgear(ctx, look, 0, -38, 0.1);
+    });
+  },
+};
+
+// ---- Treasure goblin ----
+
+export const goblin = {
+  height: 46,
+  rest: REST,
+  idle: (t) => ({
+    y: -Math.abs(Math.sin(t * 9)) * 3,
+    sq: 1 + Math.sin(t * 18) * 0.03,
+    lean: Math.sin(t * 4.5) * 0.08,
+    arm: Math.sin(t * 9) * 0.4,
+    wob: t,
+    blink: t % 2.6 < 0.12 ? 1 : 0,
+  }),
+  actions: baseActions,
+  draw(ctx, P, look) {
+    const skin = look.colors?.body || '#7cc65a';
+    const cloth = look.colors?.accent || '#8a5a32';
+    squash(ctx, P, () => {
+      // Sack of gold on the back, coins peeking out.
+      at(ctx, -12, -24, Math.sin(P.wob * 9) * 0.08, () => {
+        blob(ctx, smooth([[-12, 8], [-14, -6], [-6, -16], [6, -15], [10, -4], [9, 9]], 0.9), '#c8a06a', { depth: 3 });
+        blob(ctx, circle(-2, -17, 3.4), GOLD, { ow: 1.4, depth: 0.8 });
+        blob(ctx, circle(4, -16, 3), GOLD, { ow: 1.4, depth: 0.8 });
+        line(ctx, (c) => { c.moveTo(-8, -12); c.quadraticCurveTo(0, -9, 8, -11); }, '#7a4a2c', 2);
+        flat(ctx, star(-3, -2, 3, 1.3, 5), GOLD);
+      });
+      // Legs and body.
+      blob(ctx, capsule(-4, -14, -6 - P.arm * 3, -1, 2.6), skin, { depth: 0.8, ow: 1.8 });
+      blob(ctx, capsule(4, -14, 6 + P.arm * 3, -1, 2.6), skin, { depth: 0.8, ow: 1.8 });
+      blob(ctx, smooth([[-9, -12], [-8, -24], [0, -28], [8, -24], [9, -12], [0, -9]], 0.9), cloth, { depth: 2.4 });
+      blob(ctx, roundRect(-9, -15, 18, 3.6, 1.6), '#5a3620', { ow: 1.4, depth: 0.6 });
+      // Head: big ears and nose, greedy grin.
+      at(ctx, 2, -32, P.lean * 0.5, () => {
+        blob(ctx, poly([[-8, -2], [-20, -8], [-9, 3]]), skin, { depth: 1.2 });
+        blob(ctx, poly([[8, -3], [19, -10], [10, 3]]), skin, { depth: 1.2 });
+        blob(ctx, circle(0, 0, 10), skin, { depth: 2.4 });
+        blob(ctx, ellipse(9, 2, 4.4, 3.4, 0.3), darker(skin, 0.15), { depth: 1, ow: 1.8 });
+        eye(ctx, 2, -3, 3.2, { lx: 0.7, blink: P.blink, angry: 0.2, white: '#fff6c0' });
+        eye(ctx, 9.5, -3.5, 2.8, { lx: 0.7, blink: P.blink, angry: 0.2, white: '#fff6c0' });
+        blob(ctx, (c) => { c.moveTo(-1, 5); c.quadraticCurveTo(5, 10 + P.mouth * 2, 10, 6); c.closePath(); }, '#5a1426', { ow: 1.4, shade: false, noLight: true });
+        flat(ctx, poly([[2, 5.6], [3.6, 8], [5, 6]]), '#ffffff');
+      });
+      // Arm hugging a coin.
+      at(ctx, 7, -22, 0.4 + P.arm * 0.3, () => {
+        blob(ctx, capsule(0, 0, 0, 8, 2.4), skin, { depth: 0.8, ow: 1.8 });
+        blob(ctx, circle(1, 10, 3.6), GOLD, { ow: 1.4, depth: 0.8, light: '#fff2a8' });
+      });
     });
   },
 };

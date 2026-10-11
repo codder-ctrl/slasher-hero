@@ -1,5 +1,5 @@
 import {
-  UPGRADES, SKILLS, ZONES, KILLS_PER_STAGE, BOSS_TIME, PRESTIGE_MIN_STAGE, SOUL_BONUS,
+  UPGRADES, SKILLS, ZONES, KILLS_PER_STAGE, BOSS_TIME, PRESTIGE_MIN_STAGE, SOUL_BONUS, SPECIALS,
   MILESTONE_EVERY, SPIRIT_STEP,
 } from './config.js';
 import * as L from './logic.js';
@@ -8,6 +8,8 @@ import { VERSION } from './changelog.js';
 import { createPetPage } from './ui-pets.js';
 import { createDungeonPage } from './ui-dungeon.js';
 import { createWindows } from './ui-windows.js';
+import { createGearCard } from './ui-gear.js';
+import { createSoulTree } from './ui-souls.js';
 
 // DOM side of the game: HUD over the battle, the tabbed panel below it and modals.
 // It never changes game state itself; every action goes through the handlers from main.js.
@@ -54,6 +56,8 @@ function attachRepeat(btn, fn) {
 
 const withUpgrade = (state, id, level) => ({ ...state, upgrades: { ...state.upgrades, [id]: level } });
 const pct = (x) => `%${Math.round(x * 100)}`;
+// Multipliers with at most two decimals (equipment makes them fractional).
+const mult = (x) => String(Math.round(x * 100) / 100);
 
 function upgradeEffect(def, state, now, next, maxed) {
   const pair = (label, a, b) => (maxed || a === b ? `${label}: ${a}` : `${label}: ${a} → ${b}`);
@@ -63,11 +67,15 @@ function upgradeEffect(def, state, now, next, maxed) {
     case 'crit':
       return pair('Şans', pct(L.critChance(withUpgrade(state, 'crit', now))), pct(L.critChance(withUpgrade(state, 'crit', next))));
     case 'critDmg':
-      return pair('Çarpan', '×' + L.critMultiplier(withUpgrade(state, 'critDmg', now)), '×' + L.critMultiplier(withUpgrade(state, 'critDmg', next)));
+      return pair('Çarpan', '×' + mult(L.critMultiplier(withUpgrade(state, 'critDmg', now))), '×' + mult(L.critMultiplier(withUpgrade(state, 'critDmg', next))));
     case 'greed':
       return pair('Altın', '+' + pct(L.goldMultiplier(withUpgrade(state, 'greed', now)) - 1), '+' + pct(L.goldMultiplier(withUpgrade(state, 'greed', next)) - 1));
     case 'spirit':
       return pair('Aktarım', pct(now * SPIRIT_STEP), pct(next * SPIRIT_STEP));
+    case 'vitality':
+      return pair('Can', fmt(L.heroMaxHp(state, now)), fmt(L.heroMaxHp(state, next)));
+    case 'armor':
+      return pair('Savunma', pct(1 - L.damageTakenMultiplier(L.heroArmor(state, now))), pct(1 - L.damageTakenMultiplier(L.heroArmor(state, next))));
     default:
       return '';
   }
@@ -106,7 +114,7 @@ export function createUI(h) {
     goldPill: $('gold-pill'), gold: $('gold'), dps: $('dps'), soulsPill: $('souls-pill'), souls: $('souls'),
     zone: $('zone-name'), stage: $('stage-label'), prev: $('stage-prev'), next: $('stage-next'),
     enemyName: $('enemy-name'), progress: $('enemy-progress'), hpFill: $('hp-fill'), hpText: $('hp-text'),
-    timerBar: $('timer-bar'), timerFill: $('timer-fill'), timerText: $('timer-text'),
+    timerBar: $('timer-bar'), timerFill: $('timer-fill'), timerText: $('timer-text'), shieldFill: $('shield-fill'),
     auto: $('auto-btn'), hint: $('tap-hint'), buyBar: $('buy-bar'), skillBar: $('skill-bar'), skillList: $('skill-list'),
     summary: $('hero-summary'), upgradeList: $('upgrade-list'), version: $('version-btn'),
     rbSouls: $('rb-souls'), rbBonus: $('rb-bonus'), rbStage: $('rb-stage'), rbGain: $('rb-gain'), rbBtn: $('rb-btn'), rbNote: $('rb-note'),
@@ -177,10 +185,14 @@ export function createUI(h) {
     return c;
   });
 
-  const pageTools = { h, icon, make, set, makeCard, fmt };
+  // Pages can also open windows (the Ekipman card opens the Ekipman window).
+  const uiHandlers = Object.assign(Object.create(h), { openWindow: (name, opts) => { windows.open(name, opts); lastPanel = 0; } });
+  const pageTools = { h: uiHandlers, icon, make, set, makeCard, fmt };
   const petPage = createPetPage(pageTools);
   const dungeonPage = createDungeonPage(pageTools);
   const windows = createWindows(pageTools);
+  const gearCard = createGearCard(pageTools);
+  const soulTree = createSoulTree(pageTools);
 
   const skillCards = SKILLS.map((def) => {
     const c = makeCard(icon(def.icon), () => h.buy('skill', def.id));
@@ -259,7 +271,7 @@ export function createUI(h) {
     el.skillBar.hidden = !any;
   }
 
-  const summaryRows =['Dokunuş', 'Kritik', 'Altın', 'Ruh bonusu'].map((label) => {
+  const summaryRows = ['Dokunuş', 'Kritik', 'Altın', 'Can', 'Savunma', 'Ruh bonusu'].map((label) => {
     const row = make('div', 'sum-cell');
     const value = make('b');
     row.append(make('span', null, label), value);
@@ -287,15 +299,18 @@ export function createUI(h) {
     });
 
     set(summaryRows[0], fmt(L.tapDamage(state)));
-    set(summaryRows[1], `${pct(L.critChance(state))} ×${L.critMultiplier(state)}`);
+    set(summaryRows[1], `${pct(L.critChance(state))} ×${mult(L.critMultiplier(state))}`);
     set(summaryRows[2], `×${L.goldMultiplier(state).toFixed(1)}`);
-    set(summaryRows[3], `+${pct(state.souls * SOUL_BONUS)}`);
+    set(summaryRows[3], fmt(L.heroMaxHp(state)));
+    set(summaryRows[4], pct(1 - L.damageTakenMultiplier(L.heroArmor(state))));
+    set(summaryRows[5], `+${pct(state.souls * SOUL_BONUS)}`);
 
-    tabButton('hero').classList.toggle('badge', heroAfford);
+    tabButton('hero').classList.toggle('badge', gearCard.update(state) || heroAfford);
     tabButton('pet').classList.toggle('badge', petPage.update(state, amount));
     tabButton('dungeon').classList.toggle('badge', dungeonPage.update(state));
     tabButton('skills').classList.toggle('badge', updateSkillCards(state, amount));
-    tabButton('rebirth').classList.toggle('badge', L.prestigeSouls(state) > 0);
+    const nodeReady = soulTree.update(state);
+    tabButton('rebirth').classList.toggle('badge', L.prestigeSouls(state) > 0 || nodeReady);
   }
 
   // ---- Rebirth and menu pages ----
@@ -370,18 +385,28 @@ export function createUI(h) {
     const e = state.enemy;
     if (e.respawn <= 0) {
       const def = zone.enemies[e.kind] ?? zone.enemies[0];
-      set(el.enemyName, e.boss ? `BOSS · ${def.name}` : def.name);
+      const name = e.variant === 'goblin' ? SPECIALS.goblin.name
+        : e.variant === 'elite' ? `Elit ${def.name}`
+          : e.variant === 'armored' ? `Zırhlı ${def.name}` : def.name;
+      set(el.enemyName, e.boss ? `BOSS · ${name}` : name);
       el.enemyName.classList.toggle('boss', e.boss);
+      el.enemyName.classList.toggle('special', e.variant === 'elite' || e.variant === 'goblin');
     }
     const hpFrac = Math.max(0, e.hp / e.maxHp);
     el.hpFill.style.transform = `scaleX(${hpFrac})`;
-    set(el.hpText, `${fmt(Math.max(0, Math.ceil(e.hp)))} / ${fmt(e.maxHp)}`);
+    // A boss shield sits over the HP bar until it breaks.
+    el.shieldFill.hidden = !(e.shield > 0);
+    if (e.shield > 0) el.shieldFill.style.transform = `scaleX(${e.shield / e.shieldMax})`;
+    set(el.hpText, e.shield > 0 ? `Kalkan ${fmt(Math.ceil(e.shield))}` : `${fmt(Math.max(0, Math.ceil(e.hp)))} / ${fmt(e.maxHp)}`);
     set(el.progress, state.stage < state.maxStage ? '✓' : e.boss ? '' : `${state.kills}/${KILLS_PER_STAGE}`);
 
-    el.timerBar.hidden = !e.boss;
-    if (e.boss) {
-      el.timerFill.style.transform = `scaleX(${Math.max(0, e.timeLeft / BOSS_TIME)})`;
-      set(el.timerText, `${Math.max(0, e.timeLeft).toFixed(1)} sn`);
+    // Bosses race the clock; a goblin counts down to its escape.
+    const timed = e.boss || (e.variant === 'goblin' && e.respawn <= 0);
+    el.timerBar.hidden = !timed;
+    if (timed) {
+      const total = e.boss ? BOSS_TIME : SPECIALS.goblin.flee;
+      el.timerFill.style.transform = `scaleX(${Math.max(0, e.timeLeft / total)})`;
+      set(el.timerText, `${e.boss ? '' : 'Kaçıyor · '}${Math.max(0, e.timeLeft).toFixed(1)} sn`);
     }
 
     el.auto.hidden = state.autoAdvance;

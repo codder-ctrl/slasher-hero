@@ -1,5 +1,6 @@
 import { COMPANIONS, ROLES, TEAM_SIZE } from './config.js';
 import * as D from './dungeon.js';
+import { SYNERGIES } from './config.js';
 
 // The Zindan tab: floor info and the companion list (recruit, level up, team in/out, all with
 // kristal). The fight itself is drawn by dungeon-view.js into #dungeon-canvas.
@@ -7,7 +8,15 @@ import * as D from './dungeon.js';
 const $ = (id) => document.getElementById(id);
 
 export function createDungeonPage({ h, icon, make, set, makeCard, fmt }) {
-  const el = { floor: $('dg-floor'), best: $('dg-best'), kristal: $('dg-kristal'), team: $('team-count'), list: $('companion-list') };
+  const el = { floor: $('dg-floor'), best: $('dg-best'), kristal: $('dg-kristal'), team: $('team-count'), list: $('companion-list'), synergy: $('dg-synergy') };
+  // Synergy chips: lit while the team qualifies.
+  const chips = SYNERGIES.map((syn) => {
+    const chip = make('span', 'synergy', syn.name);
+    chip.title = syn.text;
+    chip.addEventListener('click', () => h.toast?.(`${syn.name}: ${syn.text}`));
+    el.synergy.append(chip);
+    return { syn, chip };
+  });
 
   const cards = COMPANIONS.map((def) => {
     const c = makeCard(icon('actor:' + def.actor, { colors: def.colors, role: def.role, shotColor: def.shotColor }), () => h.companion(def.id), 'crystal');
@@ -28,6 +37,8 @@ export function createDungeonPage({ h, icon, make, set, makeCard, fmt }) {
     set(el.kristal, fmt(state.kristal));
     const team = state.dungeon.team;
     set(el.team, `${team.length}/${TEAM_SIZE}`);
+    const active = new Set(D.activeSynergies(team.filter((id) => state.companions[id] > 0)).map((x) => x.id));
+    for (const c of chips) c.chip.classList.toggle('on', active.has(c.syn.id));
 
     let afford = false;
     COMPANIONS.forEach((def, i) => {
