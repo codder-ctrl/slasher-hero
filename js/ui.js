@@ -512,14 +512,16 @@ export function createUI(h) {
       };
       if (ev.reward.elmas) line('gem', `+${ev.reward.elmas} elmas`);
       if (ev.reward.keys) line('keyIcon', `+${ev.reward.keys} Boss Anahtarı`);
-      if (ev.reward.kristal) line('crystal', `+${fmt(ev.reward.kristal)} kristal`);
+      if (ev.reward.gold) line('coinIcon', `+${fmt(ev.reward.gold)} altın`);
       if (ev.reward.item) {
         line('chest', `${RARITIES[ev.reward.item.rarity].name} eşya: ${G.itemName(ev.reward.item)}`);
         body.at(-1).style.color = RARITIES[ev.reward.item.rarity].color;
       }
-      line('trophy', ev.first ? `Yeni kupa: ${def.trophy.name} · ${trophyText(def, ev.trophy)}` : `${def.trophy.name} Sv. ${ev.trophy} · ${trophyText(def, ev.trophy)}`, 'trophy');
-      body.push(make('p', 'note center', ev.first ? 'Kupa kalıcıdır, yeniden doğuşta da kalır.' : ''));
-      body.push(make('p', 'note center', `Sıradaki savaş: ${def.name} Sv. ${L.megaLevel(state, def)}. Daha güçlü, kupası da büyür.`));
+      if (ev.first) {
+        line('trophy', `Yeni kupa: ${def.trophy.name} · ${trophyText(def)}`, 'trophy');
+        body.push(make('p', 'note center', 'Kupa kalıcıdır, yeniden doğuşta da kalır.'));
+      }
+      body.push(make('p', 'note center', `Sıradaki savaş: ${def.name} Sv. ${L.megaLevel(state, def)}. Daha güçlü, altın ödülü de daha büyük.`));
       openModal({ title: ev.first ? `${def.name} ilk kez yenildi!` : `${def.name} yenildi!`, body, actions: [{ label: 'Harika!', kind: 'accent' }] });
     },
     setTab,

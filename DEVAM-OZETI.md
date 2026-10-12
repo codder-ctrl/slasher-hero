@@ -1,6 +1,6 @@
 # Slasher Hero — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-11. Canlı sürüm: **v0.7.0**.
+Son güncelleme: 2026-10-11. Canlı sürüm: **v0.7.1**.
 
 ## Proje
 
@@ -57,6 +57,7 @@ Son güncelleme: 2026-10-11. Canlı sürüm: **v0.7.0**.
     - 60 sn, 3 evre (öfkelenir), ayrı arenalar (Taş Labirent, Zehirli Yuva). "Arenadan çık" düğmesi.
     - İlk zafer çok ödül (elmas + Destansı eşya + kalıcı kupa), tekrar zaferler daha az (kullanıcının isteği) ama boss ve kupa seviye atlar.
     - Denge: `node tools/sim.js --mega` → ilk turda ~110. bölümde Minotor Sv.1 ≈ 55 sn.
+- **0.7.1:** Kullanıcının isteği: kupa sadece ilk zaferde, sabit yüzde (büyümez, kolay boss kasarak güçlenme olmasın). Tekrar zaferler sadece altın (`megaGold`, boss seviyesiyle artar). Haritada ödüller sembollerle (kupa satırı altın yazıyla kaldı).
 - **0.7.0:** Kalan 4 mega boss ve arenaları: Kraken (Batık Liman, dokunaç kırbacı), Tepegöz (Dev Dağı, kaya fırlatma), Lich Kral (Lanetli Kale, kafatası büyüsü, ilk zafer Efsanevi), Kara Ejderha (Ejder Yuvası, ateş, ilk zafer Efsanevi). Kullanıcı 0.6.0 için: "güzel olmuş, sorun görmedim".
 
 ## Kullanıcının puanları (v0.1 sonrası)

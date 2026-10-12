@@ -483,15 +483,17 @@ export const ZONES = [
 // soul tree's Sabır), and three phases (from the HP shares in `phases`) that hit harder and
 // more often. Entering costs a key: keysPerDay come back each local day, more cost elmas; a
 // lost fight gives its key back and a first win adds one.
-// The first win pays `first` (elmas, an item of at least `rarity`) and the trophy; every later
-// win pays the smaller RAID.repeat, and the boss and its trophy go up a level (up to maxLevel).
-// Trophies are permanent: `kind` tap / pet / gold / hp / critDmg / all, worth
-// base + step × (level − 1).
+// The first win pays `first` (elmas, an item of at least `rarity`, a key) and the trophy, once.
+// Every later win pays only gold, worth `repeat.gold` stage bosses of the boss's own HP, so it
+// grows with the boss's level (up to maxLevel); the trophy never grows, so farming the easiest
+// boss can't make the hero stronger (the user asked for that).
+// Trophies are permanent: `kind` tap / pet / gold / hp / critDmg / all, raising that by
+// `power` (a share: 0.25 = +25%); 'all' counts for tap and pet damage.
 export const RAID = {
   time: 60,
   hpMult: 10,
   levelGrowth: 2.5,
-  maxLevel: 10,
+  maxLevel: 20,
   atkMult: 6,
   atkLevel: 1.4,                 // attack × this per boss level
   phases: [0.66, 0.33],
@@ -503,7 +505,7 @@ export const RAID = {
   keyCost: 30,                   // elmas
   firstKeys: 1,                  // keys given on a boss's first win (a lost fight refunds its key)
   leaveDelay: 2.2,               // seconds of victory before the main battle comes back
-  repeat: { elmas: 15, kristal: 40, itemChance: 0.3 },  // kristal × (boss number) × level
+  repeat: { gold: 3 },           // gold = boss HP × GOLD_PER_HP × gold multiplier × this
 };
 
 export const MEGA_BOSSES = [
@@ -511,36 +513,36 @@ export const MEGA_BOSSES = [
     id: 'minotaur', name: 'Minotor', land: 'Taş Labirent', theme: 'labyrinth', actor: 'minotaur', unlock: 100,
     colors: { body: '#8a5236', accent: '#e8dcc0' },
     first: { elmas: 150, rarity: 2 },
-    trophy: { kind: 'tap', base: 0.15, step: 0.05, name: 'Boğa Boynuzu' },
+    trophy: { kind: 'tap', power: 0.25, name: 'Boğa Boynuzu' },
   },
   {
     id: 'spider', name: 'Örümcek Kraliçe', land: 'Zehirli Yuva', theme: 'lair', actor: 'spiderQueen', unlock: 200,
     colors: { body: '#3e2a52', accent: '#9ae04a' },
     first: { elmas: 200, rarity: 2 },
-    trophy: { kind: 'pet', base: 0.25, step: 0.08, name: 'Zehir Dişi' },
+    trophy: { kind: 'pet', power: 0.3, name: 'Zehir Dişi' },
   },
   {
     id: 'kraken', name: 'Kraken', land: 'Batık Liman', theme: 'harbor', actor: 'kraken', unlock: 300,
     colors: { body: '#c0485a', accent: '#f2c87a' },
     first: { elmas: 250, rarity: 2 },
-    trophy: { kind: 'gold', base: 0.3, step: 0.1, name: 'Mürekkep Kesesi' },
+    trophy: { kind: 'gold', power: 0.4, name: 'Mürekkep Kesesi' },
   },
   {
     id: 'cyclops', name: 'Tepegöz', land: 'Dev Dağı', theme: 'peak', actor: 'cyclops', unlock: 400,
     colors: { body: '#8aa0b8', accent: '#7a4a2c' },
     first: { elmas: 300, rarity: 2 },
-    trophy: { kind: 'hp', base: 0.3, step: 0.1, name: 'Dev Gözü' },
+    trophy: { kind: 'hp', power: 0.4, name: 'Dev Gözü' },
   },
   {
     id: 'lich', name: 'Lich Kral', land: 'Lanetli Kale', theme: 'castle', actor: 'lich', unlock: 500,
     colors: { body: '#3e3458', accent: '#6af0d0' },
     first: { elmas: 400, rarity: 3 },
-    trophy: { kind: 'critDmg', base: 0.5, step: 0.15, name: 'Lanetli Taç' },
+    trophy: { kind: 'critDmg', power: 0.3, name: 'Lanetli Taç' },
   },
   {
     id: 'dragon', name: 'Kara Ejderha', land: 'Ejder Yuvası', theme: 'dragonlair', actor: 'blackDragon', unlock: 600,
     colors: { body: '#3e3654', accent: '#ff7a2a' },
     first: { elmas: 500, rarity: 3 },
-    trophy: { kind: 'all', base: 0.25, step: 0.08, name: 'Ejder Kalbi' },
+    trophy: { kind: 'all', power: 0.3, name: 'Ejder Kalbi' },
   },
 ];

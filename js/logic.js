@@ -165,8 +165,8 @@ const passive = (state, id) => { const a = petAbility(state); return a?.id === i
 
 export const goldMultiplier = (state) => (1 + state.upgrades.greed * GREED_STEP)
   * (1 + gearTotals(state).gold) * (1 + treeValue(state, 'goldPower')) * (1 + passive(state, 'scan')) * (1 + trophyValue(state, 'gold'));
-export const critMultiplier = (state) => BASE_CRIT_MULT + state.upgrades.critDmg * CRIT_MULT_STEP + gearTotals(state).critDmg
-  + trophyValue(state, 'critDmg');
+export const critMultiplier = (state) => (BASE_CRIT_MULT + state.upgrades.critDmg * CRIT_MULT_STEP + gearTotals(state).critDmg)
+  * (1 + trophyValue(state, 'critDmg'));
 
 export function critChance(state) {
   const base = Math.min(MAX_CRIT_CHANCE, BASE_CRIT_CHANCE + state.upgrades.crit * CRIT_CHANCE_STEP);
@@ -1018,16 +1018,18 @@ export const megaWins = (state, def) => state.raid.wins[def.id] || 0;
 // Level of the next fight: 1 until the first win, then one more per win.
 export const megaLevel = (state, def) => Math.min(RAID.maxLevel, megaWins(state, def) + 1);
 export const megaHp = (def, level) => Math.ceil(enemyMaxHp(def.unlock, true) * RAID.hpMult * RAID.levelGrowth ** (level - 1));
-export const trophyLevel = (state, def) => Math.min(RAID.maxLevel, megaWins(state, def));
-export const trophyPower = (def, level) => (level > 0 ? def.trophy.base + def.trophy.step * (level - 1) : 0);
+// Trophies come with the first win and stay the same after (no growth from farming).
+export const hasTrophy = (state, def) => megaWins(state, def) > 0;
+// Gold for a repeat win: grows with the boss's HP, so with its level.
+export const megaGold = (state, def, level) => Math.ceil(megaHp(def, level) * GOLD_PER_HP * goldMultiplier(state) * RAID.repeat.gold);
 
-// Sum of the trophies of a kind; 'all' trophies count for tap and pet damage.
+// Sum of the owned trophies of a kind (shares, e.g. 0.25 = +25%); 'all' counts for tap and pet.
 export function trophyValue(state, kind) {
   if (!state.raid) return 0;
   let v = 0;
   for (const m of MEGA_BOSSES) {
     const t = m.trophy;
-    if (t.kind === kind || (t.kind === 'all' && (kind === 'tap' || kind === 'pet'))) v += trophyPower(m, trophyLevel(state, m));
+    if (hasTrophy(state, m) && (t.kind === kind || (t.kind === 'all' && (kind === 'tap' || kind === 'pet')))) v += t.power;
   }
   return v;
 }
@@ -1098,22 +1100,20 @@ function raidWon(state, events, rng) {
   e.hp = 0;
   e.respawn = RAID.leaveDelay;
   state.stats.bossKills++;
-  const reward = { elmas: 0, kristal: 0, item: null, keys: 0 };
+  const reward = { elmas: 0, gold: 0, item: null, keys: 0 };
   if (first) {
     reward.elmas = def.first.elmas;
     reward.keys = RAID.firstKeys;
     reward.item = dropItem(state, rng, events, 'mega', def.first.rarity);
   } else {
-    reward.elmas = RAID.repeat.elmas;
-    reward.kristal = RAID.repeat.kristal * (MEGA_BOSSES.indexOf(def) + 1) * e.level;
-    if (rng() < RAID.repeat.itemChance) reward.item = dropItem(state, rng, events, 'mega', 1);
+    reward.gold = megaGold(state, def, e.level);
   }
   state.elmas += reward.elmas;
-  state.kristal += reward.kristal;
+  if (reward.gold) addGold(state, reward.gold);
   state.raid.keys += reward.keys;
   state.raid.wins[def.id] = megaWins(state, def) + 1;
   events.push({ type: 'kill', gold: 0, boss: true, variant: 'raid' });
-  events.push({ type: 'raidWin', id: def.id, first, level: e.level, reward, trophy: trophyLevel(state, def) });
+  events.push({ type: 'raidWin', id: def.id, first, level: e.level, reward });
 }
 
 // Lost (time ran out, knocked out, or left): the key comes back and the main battle returns.

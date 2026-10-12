@@ -1064,10 +1064,14 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .map-range { font-size: 11px; font-weight: 600; color: var(--parch-dim); }
 .map-boss { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; color: #6a2a3a; }
 .map-boss img { width: 28px; height: 28px; flex: none; }
-.map-reward { font-size: 12px; font-weight: 600; line-height: 1.25; color: #2a6fc0; }
 .map-trophy { font-size: 12px; font-weight: 600; line-height: 1.25; color: var(--gold-dark); }
 .map-reward:empty { display: none; }
 .map-fight { margin-top: 4px; padding: 5px 8px; font-size: 14px; }
 .reward-line { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-family: var(--display); font-size: 17px; }
 .reward-line img { width: 26px; height: 26px; flex: none; }
 .reward-line.trophy { color: var(--gold-dark); font-size: 15px; }
+.map-reward { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; }
+.map-reward-label { font-size: 12px; font-weight: 700; color: var(--parch-dim); }
+.reward-chip { display: inline-flex; align-items: center; gap: 2px; font-family: var(--display); font-size: 14px; color: var(--parch-ink); }
+.reward-chip img { width: 20px; height: 20px; }
+.reward-chip b { font-weight: 400; }

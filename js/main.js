@@ -89,6 +89,7 @@ function dispatch(events) {
         break;
       case 'raidWin':
         renderer.showBanner('MEGA ZAFER!', '#e0a020', 2);
+        if (ev.reward.gold) renderer.coinShower(40);
         setTimeout(() => ui.showRaidWin(ev, state), 1300);
         break;
       case 'raidLose': {

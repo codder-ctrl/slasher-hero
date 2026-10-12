@@ -10,14 +10,12 @@ import { zoneArtUrl } from './icons.js';
 const SVG = 'http://www.w3.org/2000/svg';
 
 const TROPHY_TEXT = {
-  tap: 'dokunuş hasarı', pet: 'pet hasarı', gold: 'altın', hp: 'can', critDmg: 'kritik çarpanı', all: 'tüm hasar',
+  tap: 'dokunuş hasarı', pet: 'pet hasarı', gold: 'altın', hp: 'can', critDmg: 'kritik hasarı', all: 'tüm hasar',
 };
 
-// "+%15 dokunuş hasarı" (critDmg shows as a multiplier: "+×0.50 kritik çarpanı").
-export function trophyText(def, level) {
-  const v = L.trophyPower(def, Math.max(1, level));
-  const n = def.trophy.kind === 'critDmg' ? `+×${v.toFixed(2)}` : `+%${Math.round(v * 100)}`;
-  return `${n} ${TROPHY_TEXT[def.trophy.kind]}`;
+// "+%25 dokunuş hasarı".
+export function trophyText(def) {
+  return `+%${Math.round(def.trophy.power * 100)} ${TROPHY_TEXT[def.trophy.kind]}`;
 }
 
 function road(fromLeft) {
@@ -32,7 +30,7 @@ function road(fromLeft) {
   return svg;
 }
 
-export function createMapView({ h, icon, make, set }) {
+export function createMapView({ h, icon, make, set, fmt }) {
   const root = make('div', 'window-view map-view');
 
   // Keys: how many, when they refill, and buying one more.
@@ -54,12 +52,26 @@ export function createMapView({ h, icon, make, set }) {
   buy.addEventListener('click', () => h.buyRaidKey());
   keys.append(keyIcon, keyText, buy);
 
-  const lead = make('p', 'note center', 'Her diyarı bir mega boss yönetir. 100 bölümde bir yeni diyar açılır. İlk zafer büyük ödül ve kalıcı bir kupa verir; sonraki zaferler boss\'u ve kupayı güçlendirir. Yenilirsen anahtarın geri gelir.');
+  const lead = make('p', 'note center', 'Her diyarı bir mega boss yönetir. 100 bölümde bir yeni diyar açılır. İlk zafer büyük ödül ve kalıcı bir kupa verir; sonraki zaferler boss\'u güçlendirir ve giderek artan altın verir. Yenilirsen anahtarın geri gelir.');
   const list = make('div', 'map-road');
   root.append(keys, lead, list);
 
   let built = '';
   const stops = [];
+
+  // Reward symbols with their amounts: [[icon, text, color?], ...].
+  function chips(list) {
+    return list.map(([name, text, color]) => {
+      const chip = make('span', 'reward-chip');
+      const img = make('img');
+      img.alt = '';
+      img.src = icon(name, null, 20);
+      const b = make('b', null, text);
+      if (color) b.style.color = color;
+      chip.append(img, b);
+      return chip;
+    });
+  }
 
   function stop(def, i) {
     const node = make('div', `map-stop ${i % 2 ? 'right' : 'left'}`);
@@ -101,7 +113,7 @@ export function createMapView({ h, icon, make, set }) {
     fight.addEventListener('click', () => h.startRaid(def.id));
     info.append(title, bossRow, unlock, reward, trophy, fight);
     node.append(art, info);
-    stops.push({ def, node, lock, check, lvl, bossName, unlock, reward, trophy, fight });
+    stops.push({ def, node, lock, check, lvl, bossName, unlock, reward, trophy, fight, rewardKey: '' });
     return node;
   }
 
@@ -118,6 +130,19 @@ export function createMapView({ h, icon, make, set }) {
     set(keyNote, k >= RAID.keysPerDay ? `Her gün ${RAID.keysPerDay} anahtar` : `Yarın ${RAID.keysPerDay}'e tamamlanır`);
     buy.disabled = state.elmas < RAID.keyCost;
     const fighting = L.inRaid(state);
+    // Gold for a win follows the gold multiplier, so rewards are checked on every update.
+    for (const s of stops) {
+      const { def } = s;
+      if (def.soon) continue;
+      const wins = L.megaWins(state, def);
+      const list = wins === 0
+        ? [['gem', String(def.first.elmas)], ['chest', RARITIES[def.first.rarity].name, RARITIES[def.first.rarity].color], ['keyIcon', `+${RAID.firstKeys}`]]
+        : [['coinIcon', fmt(L.megaGold(state, def, L.megaLevel(state, def)))]];
+      const rk = list.map((x) => x[1]).join('|') + wins;
+      if (rk === s.rewardKey) continue;
+      s.rewardKey = rk;
+      s.reward.replaceChildren(make('span', 'map-reward-label', wins === 0 ? 'İlk zafer:' : 'Zafer:'), ...chips(list));
+    }
     const key = `${k}:${fighting}:${state.stats.bestStage}:${JSON.stringify(state.raid.wins)}`;
     if (key === built) return;
     built = key;
@@ -133,17 +158,7 @@ export function createMapView({ h, icon, make, set }) {
       set(s.bossName, def.soon ? 'Yakında...' : open || wins ? def.name : '???');
       set(s.lvl, open ? `Sv. ${L.megaLevel(state, def)}` : '');
       set(s.unlock, def.soon ? `${def.unlock}. bölümden sonra · çok yakında` : open ? `${wins} zafer` : `${def.unlock}. bölümü geçince açılır (en iyi: ${state.stats.bestStage - 1})`);
-      if (def.soon) {
-        set(s.reward, '');
-        set(s.trophy, `Kupa: ${def.trophy.name}`);
-      } else if (wins === 0) {
-        set(s.reward, `İlk zafer: ${def.first.elmas} elmas + ${RARITIES[def.first.rarity].name} eşya + kupa + ${RAID.firstKeys} anahtar`);
-        set(s.trophy, `Kupa: ${def.trophy.name} · ${trophyText(def, 1)}`);
-      } else {
-        const tl = L.trophyLevel(state, def);
-        set(s.reward, `Tekrar zafer: ${RAID.repeat.elmas} elmas + kristal${RAID.repeat.itemChance ? ' + eşya şansı' : ''}`);
-        set(s.trophy, `Kupa Sv. ${tl}: ${trophyText(def, tl)}${tl < RAID.maxLevel ? ` → ${trophyText(def, tl + 1)}` : ' (MAKS)'}`);
-      }
+      set(s.trophy, `${wins > 0 ? '✓ ' : ''}Kupa: ${def.trophy.name} · ${trophyText(def)}`);
       s.fight.hidden = !open;
       s.fight.disabled = fighting || k <= 0;
       set(s.fight, fighting ? 'Savaş sürüyor' : k > 0 ? 'Savaş · 1 anahtar' : 'Anahtar yok');

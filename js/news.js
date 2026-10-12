@@ -12,7 +12,7 @@ export const NEWS = [
     body: [
       'Haritanın kalan dört diyarı açıldı. Batık Liman’da korsan şapkalı Kraken dokunaçlarını savuruyor, Dev Dağı’nın zirvesinde Tepegöz kaya fırlatıyor.',
       'Lanetli Kale’de Lich Kral lanetli kafatasları yağdırıyor, Ejder Yuvası’nda ise altın yığınlarının üstünde Kara Ejderha seni bekliyor.',
-      'Son iki boss ilk zaferde Efsanevi eşya veriyor; kupalarıyla altın, can, kritik ve tüm hasarın kalıcı olarak büyür. İyi şanslar!',
+      'Son iki boss ilk zaferde Efsanevi eşya veriyor; kupalarıyla altın, can, kritik ve tüm hasarın kalıcı olarak artar. İyi şanslar!',
     ],
   },
   {
@@ -23,7 +23,7 @@ export const NEWS = [
     body: [
       'Menüdeki yeni Harita, ana yolculuktan ayrı arenalara açılıyor. Her diyarı dev bir mega boss yönetiyor: 100. bölümü geçince Taş Labirent’te Minotor, 200. bölümü geçince Zehirli Yuva’da Örümcek Kraliçe seni bekliyor. Dört diyar daha yolda!',
       'Mega savaşlar 60 saniye sürer. Boss canı azaldıkça öfkelenir, daha sık ve daha sert vurur. Saldırılarını 5 hızlı dokunuşla kesmeyi unutma. Her gün 3 Boss Anahtarın var; yenilirsen anahtar geri gelir, bir bossu ilk kez yenince de 1 anahtar hediye.',
-      'İlk zafer bol elmas, Destansı bir eşya ve kalıcı bir kupa getirir. Her yeni zafer bossu da kupayı da bir seviye büyütür.',
+      'İlk zafer bol elmas, Destansı bir eşya ve kalıcı bir kupa getirir. Sonraki zaferlerde boss bir seviye güçlenir ve giderek artan altın verir.',
       'Ayrıca Yeşil Çayır, Karanlık Orman ve Kristal Mağara’nın son bölümlerinde artık kendine özel bosslar var: Goblin Şef, Kadim Ağaç ve Kristal Golem.',
     ],
   },

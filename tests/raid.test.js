@@ -87,7 +87,7 @@ test('phases come at 66% and 33% HP and make attacks faster', () => {
   assert.ok(e.every < every1);
 });
 
-test('the first win pays much more than repeats, and wins level the boss and its trophy', () => {
+test('the first win pays elmas, an item and the trophy; repeats pay only gold that grows with the level', () => {
   const s = veteran();
   const tap0 = L.tapDamage(s);
   L.startRaid(s, 'minotaur', [], DAY1);
@@ -100,7 +100,8 @@ test('the first win pays much more than repeats, and wins level the boss and its
   assert.equal(win.reward.keys, RAID.firstKeys);
   assert.equal(s.equipment.bag.length, bag0 + 1);
   assert.ok(s.equipment.bag.at(-1).rarity >= minotaur.first.rarity);
-  assert.ok(L.tapDamage(s) > tap0 * 1.1, 'the trophy adds tap damage');
+  const tap1 = L.tapDamage(s);
+  assert.ok(Math.abs(tap1 / tap0 - (1 + minotaur.trophy.power)) < 1e-9, 'the trophy adds its share of tap damage');
   assert.equal(L.megaLevel(s, minotaur), 2);
 
   // The victory pause, then the main battle is back.
@@ -108,15 +109,23 @@ test('the first win pays much more than repeats, and wins level the boss and its
   assert.equal(L.inRaid(s), false);
   assert.equal(s.stage, 50);
 
-  L.startRaid(s, 'minotaur', [], DAY1);
-  assert.equal(s.enemy.maxHp, L.megaHp(minotaur, 2));
-  const elmas1 = s.elmas;
-  events = finish(s);
-  const again = events.find((x) => x.type === 'raidWin');
-  assert.equal(again.first, false);
-  assert.ok(s.elmas - elmas1 < minotaur.first.elmas / 5);
-  assert.ok(again.reward.kristal > 0);
-  assert.equal(L.trophyLevel(s, minotaur), 2);
+  const golds = [];
+  for (let i = 0; i < 2; i++) {
+    L.startRaid(s, 'minotaur', [], DAY1);
+    const elmas1 = s.elmas;
+    const bag1 = s.equipment.bag.length;
+    const gold1 = s.gold;
+    events = finish(s);
+    const again = events.find((x) => x.type === 'raidWin');
+    assert.equal(again.first, false);
+    assert.equal(s.elmas, elmas1, 'no elmas after the first win');
+    assert.equal(s.equipment.bag.length, bag1, 'no items after the first win');
+    assert.ok(again.reward.gold > 0 && Math.abs(s.gold - gold1 - again.reward.gold) <= again.reward.gold * 1e-9);
+    golds.push(again.reward.gold);
+    L.tick(s, RAID.leaveDelay + 0.1, noCrit, []);
+  }
+  assert.ok(golds[1] > golds[0] * 2, 'a higher level pays more gold');
+  assert.equal(L.tapDamage(s), tap1, 'the trophy does not grow with more wins');
 });
 
 test('losing on time or by knockout returns to the main battle without rewards', () => {

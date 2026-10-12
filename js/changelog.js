@@ -3,6 +3,15 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.1',
+    date: '2026-10-12',
+    notes: [
+      'Mega boss kupaları artık sadece ilk zaferde verilir ve sabit bir yüzde ekler (örneğin Boğa Boynuzu +%25 dokunuş hasarı). Aynı bossu tekrar tekrar yenmek kupayı büyütmez.',
+      'Tekrar zaferler yalnızca altın verir. Boss her zaferde bir seviye güçlenir, altın ödülü de onunla birlikte büyür.',
+      'Haritada ödüller artık sembollerle gösteriliyor.',
+    ],
+  },
+  {
     version: '0.7.0',
     date: '2026-10-12',
     notes: [
