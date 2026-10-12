@@ -269,6 +269,51 @@ export function scallop(cx, cy, rx, ry, n = 8, bulge = 0.35, rand = () => 0.5) {
 // Combines several path builders into one.
 export const many = (...paths) => (c) => { for (const p of paths) p(c); };
 
+// ---- Limbs ----
+
+// A curling limb as a list of points from (x, y): `a` is the starting heading (0 = up,
+// positive leans toward +x), `curl` the total turn along the way, `wave` sways it.
+export function curlPts(x, y, a, len, curl, wave = 0, n = 9) {
+  const pts = [];
+  const step = len / n;
+  let ang = a;
+  for (let i = 0; i <= n; i++) {
+    pts.push([x, y]);
+    ang += curl / n + Math.sin(wave + i * 0.7) * 0.05;
+    x += Math.sin(ang) * step;
+    y -= Math.cos(ang) * step;
+  }
+  return pts;
+}
+
+// A tapered tube along `pts`, `r0` thick at the base and `r1` at the tip, with optional
+// sucker dots along one side.
+export function tube(ctx, pts, r0, r1, color, opts = {}) {
+  const n = pts.length;
+  const left = [];
+  const right = [];
+  for (let i = 0; i < n; i++) {
+    const [x, y] = pts[i];
+    const [ax, ay] = pts[Math.max(0, i - 1)];
+    const [bx, by] = pts[Math.min(n - 1, i + 1)];
+    const d = Math.hypot(bx - ax, by - ay) || 1;
+    const nx = -(by - ay) / d;
+    const ny = (bx - ax) / d;
+    const r = r0 + (r1 - r0) * (i / (n - 1));
+    left.push([x + nx * r, y + ny * r]);
+    right.push([x - nx * r, y - ny * r]);
+  }
+  blob(ctx, smooth([...left, ...right.reverse()], 0.85), color, { depth: opts.depth ?? 2 });
+  if (opts.sucker) {
+    for (let i = 1; i < n - 1; i++) {
+      const [x, y] = pts[i];
+      const [px, py] = left[i];
+      const r = r0 + (r1 - r0) * (i / (n - 1));
+      flat(ctx, circle(x + (px - x) * 0.55, y + (py - y) * 0.55, r * 0.32), opts.sucker, 0.9);
+    }
+  }
+}
+
 // ---- Faces ----
 
 // A cartoon eye: white, pupil looking toward (lx, ly) in -1..1, blink in 0..1 closes it.

@@ -3,6 +3,14 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.0',
+    date: '2026-10-12',
+    notes: [
+      'Üç yeni bölüm bossu: Kızıl Çöl’ün sonunda Akrep Kral (zehirli iğne), Buz Diyarı’nda Yeti (buz kütlesi fırlatır), Volkan’da lav gölünden yükselen Lav Yılanı (yerden lav fışkırtır).',
+      'Artık her bölgenin son bölümünde kendine özel çizilmiş bir boss var. Hepsi gökten iner, kükrer ve ilk zaferde +25 elmas verir; 60. bölümden sonra yeni renklerle döner.',
+    ],
+  },
+  {
     version: '0.7.1',
     date: '2026-10-12',
     notes: [

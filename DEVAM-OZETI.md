@@ -1,6 +1,6 @@
 # Slasher Hero — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-11. Canlı sürüm: **v0.7.1**.
+Son güncelleme: 2026-10-11. Canlı sürüm: **v0.8.0**.
 
 ## Proje
 
@@ -57,6 +57,7 @@ Son güncelleme: 2026-10-11. Canlı sürüm: **v0.7.1**.
     - 60 sn, 3 evre (öfkelenir), ayrı arenalar (Taş Labirent, Zehirli Yuva). "Arenadan çık" düğmesi.
     - İlk zafer çok ödül (elmas + Destansı eşya + kalıcı kupa), tekrar zaferler daha az (kullanıcının isteği) ama boss ve kupa seviye atlar.
     - Denge: `node tools/sim.js --mega` → ilk turda ~110. bölümde Minotor Sv.1 ≈ 55 sn.
+- **0.8.0:** Çöl/Buz/Volkan bölüm bossları: Akrep Kral (`sting`, zehirli iğne), Yeti (`iceblock`, buz kütlesi fırlatma), Lav Yılanı (`eruption`, yerden lav). Artık 6 bölgenin hepsinde özel boss var. Kullanıcı 0.7.1 mega bossları için: "iyi".
 - **0.7.1:** Kullanıcının isteği: kupa sadece ilk zaferde, sabit yüzde (büyümez, kolay boss kasarak güçlenme olmasın). Tekrar zaferler sadece altın (`megaGold`, boss seviyesiyle artar). Haritada ödüller sembollerle (kupa satırı altın yazıyla kaldı).
 - **0.7.0:** Kalan 4 mega boss ve arenaları: Kraken (Batık Liman, dokunaç kırbacı), Tepegöz (Dev Dağı, kaya fırlatma), Lich Kral (Lanetli Kale, kafatası büyüsü, ilk zafer Efsanevi), Kara Ejderha (Ejder Yuvası, ateş, ilk zafer Efsanevi). Kullanıcı 0.6.0 için: "güzel olmuş, sorun görmedim".
 
@@ -89,7 +90,6 @@ Akıcılık 9, grafik 8, efektler 8, ses 9, oynanış 7. Kullanıcı stili ve se
 
 ## Sıradaki adaylar (kullanıcı henüz seçmedi)
 
-1. **Çöl/Buz/Volkan bölüm bossları** (ana oyunda, Akrep Kral, Yeti ve bir volkan bossu).
-2. **Sezonluk etkinlikler:** Duyurular (`js/news.js`) ve Posta (`MAIL`) buna hazır.
-3. **Lider tablosu:** Sunucu kurulumu gerekiyor.
-4. **Kullanıcının telefonda 0.5.1'i denedikten sonra vereceği geri bildirim.**
+1. **Sezonluk etkinlikler:** Duyurular (`js/news.js`) ve Posta (`MAIL`) buna hazır.
+2. **Lider tablosu:** Sunucu kurulumu gerekiyor.
+3. **Kullanıcının telefonda 0.8.0'ı denedikten sonra vereceği geri bildirim.**

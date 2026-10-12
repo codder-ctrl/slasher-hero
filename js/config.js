@@ -455,6 +455,10 @@ export const ZONES = [
       { actor: 'slime',    name: 'Lav Balçığı',    colors: { body: '#ef6a3a', accent: '#ffd05a' } },
       { actor: 'bat',      name: 'Akbaba Yarasa',  colors: { body: '#86553a', accent: '#f08a5a' } },
     ],
+    boss: {
+      actor: 'scorpionKing', name: 'Akrep Kral', colors: { body: '#d0702e', accent: '#f6c03a' },
+      tours: [{ body: '#3a3a4a', accent: '#c0c8d8' }, { body: '#7a2a8a', accent: '#8ae04a' }],
+    },
   },
   {
     name: 'Buz Diyarı',
@@ -464,6 +468,10 @@ export const ZONES = [
       { actor: 'ghost',    name: 'Kar Hayaleti',   colors: { body: '#eef6ff', accent: '#4a8ff0' } },
       { actor: 'bat',      name: 'Ayaz Yarasası',  colors: { body: '#8fa8c4', accent: '#4aa8f0' } },
     ],
+    boss: {
+      actor: 'yeti', name: 'Yeti', colors: { body: '#eef4fa', accent: '#5a8ad0' },
+      tours: [{ body: '#d8c8a8', accent: '#8a5a3a' }, { body: '#4a4e62', accent: '#9a6ad8' }],
+    },
   },
   {
     name: 'Volkan',
@@ -473,6 +481,10 @@ export const ZONES = [
       { actor: 'skeleton', name: 'Kor İskelet',    colors: { body: '#a8b4c0', accent: '#ff6a2a' } },
       { actor: 'slime',    name: 'Magma Balçığı',  colors: { body: '#c0384a', accent: '#ff9a3a' } },
     ],
+    boss: {
+      actor: 'lavaSerpent', name: 'Lav Yılanı', colors: { body: '#3a2a2e', accent: '#ff7a2a' },
+      tours: [{ body: '#2a3a4a', accent: '#4ae0ff' }, { body: '#4a2a3a', accent: '#c86aff' }],
+    },
   },
 ];
 

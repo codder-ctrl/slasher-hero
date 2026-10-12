@@ -152,6 +152,12 @@ export function createFx() {
             blob(g, poly([[2, -3], [9, 0], [2, 3]]), s.color, { ow: 1.2, depth: 0.6 });
             blob(g, poly([[-13, -3.4], [-8, 0], [-13, 3.4], [-11, 0]]), '#f4f0ea', { ow: 1, depth: 0.4, noLight: true });
           });
+        } else if (s.kind === 'ice') {
+          glow(g, x, y, 18, '#bff0ff', 0.4);
+          at(g, x, y, s.t * 7, () => {
+            blob(g, poly([[-13, -6], [-5, -13], [9, -10], [13, 1], [6, 11], [-10, 9]]), s.color, { ow: 2, depth: 2.6, light: '#ffffff' });
+            line(g, (c) => { c.moveTo(-6, -7); c.lineTo(2, -1); c.lineTo(1, 6); }, '#ffffff', 1.2, 0.8);
+          });
         } else if (s.kind === 'rock') {
           at(g, x, y, s.t * 9, () => {
             blob(g, smooth([[-14, 1], [-11, -10], [-1, -14], [11, -10], [14, 1], [8, 12], [-7, 12]], 0.9), s.color, { ow: 2, depth: 3, light: '#c8c2b4' });

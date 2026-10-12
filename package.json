@@ -1,6 +1,6 @@
 {
   "name": "slasher-hero",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "description": "Telefon öncelikli, tarayıcıda oynanan vektör çizimli kılıç kahramanı tıklama/gelişim oyunu (build adımı yok).",

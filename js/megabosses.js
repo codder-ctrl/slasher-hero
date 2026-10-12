@@ -1,5 +1,6 @@
 import {
   INK, at, blob, line, flat, glow, ellipse, circle, roundRect, smooth, poly, capsule, star, eye, darker, lighter, mix,
+  curlPts, tube,
 } from './paint.js';
 import { track, bump } from './anim.js';
 import { baseActions, squash } from './monsters.js';
@@ -25,49 +26,6 @@ function mark(out, ctx, x, y) {
   if (!out) return;
   const m = ctx.getTransform();
   out.muzzle = { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f };
-}
-
-// A curling limb as a list of points from (x, y): `a` is the starting heading (0 = up,
-// positive leans toward +x), `curl` the total turn along the way, `wave` sways it.
-function curlPts(x, y, a, len, curl, wave = 0, n = 9) {
-  const pts = [];
-  const step = len / n;
-  let ang = a;
-  for (let i = 0; i <= n; i++) {
-    pts.push([x, y]);
-    ang += curl / n + Math.sin(wave + i * 0.7) * 0.05;
-    x += Math.sin(ang) * step;
-    y -= Math.cos(ang) * step;
-  }
-  return pts;
-}
-
-// A tapered tube along `pts`, `r0` thick at the base and `r1` at the tip, with optional
-// sucker dots along one side.
-function tube(ctx, pts, r0, r1, color, opts = {}) {
-  const n = pts.length;
-  const left = [];
-  const right = [];
-  for (let i = 0; i < n; i++) {
-    const [x, y] = pts[i];
-    const [ax, ay] = pts[Math.max(0, i - 1)];
-    const [bx, by] = pts[Math.min(n - 1, i + 1)];
-    const d = Math.hypot(bx - ax, by - ay) || 1;
-    const nx = -(by - ay) / d;
-    const ny = (bx - ax) / d;
-    const r = r0 + (r1 - r0) * (i / (n - 1));
-    left.push([x + nx * r, y + ny * r]);
-    right.push([x - nx * r, y - ny * r]);
-  }
-  blob(ctx, smooth([...left, ...right.reverse()], 0.85), color, { depth: opts.depth ?? 2 });
-  if (opts.sucker) {
-    for (let i = 1; i < n - 1; i++) {
-      const [x, y] = pts[i];
-      const [px, py] = left[i];
-      const r = r0 + (r1 - r0) * (i / (n - 1));
-      flat(ctx, circle(x + (px - x) * 0.55, y + (py - y) * 0.55, r * 0.32), opts.sucker, 0.9);
-    }
-  }
 }
 
 const rageOf = (look) => Math.max(0, (look.phase || 1) - 1) / 2;   // 0, 0.5, 1

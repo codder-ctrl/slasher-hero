@@ -5,6 +5,16 @@
 
 export const NEWS = [
   {
+    id: 'zone-bosses-all',
+    date: '2026-10-12',
+    title: 'Çöl, Buz ve Volkan bossları geldi',
+    cover: 'scene:desert:scorpionKing',
+    body: [
+      'Kızıl Çöl’ün sonunda taçlı Akrep Kral kuyruğunu kaldırıp zehirli iğnesini fırlatıyor. Buz Diyarı’nda boynuzlu Yeti kocaman buz kütleleri savuruyor. Volkan’da ise lav gölünden yükselen Lav Yılanı yerden lav fışkırtıyor.',
+      'Böylece her bölgenin son bölümünde kendine özel bir boss var. Saldırılarını 5 hızlı dokunuşla kesmeyi unutma!',
+    ],
+  },
+  {
     id: 'mega-bosses-all',
     date: '2026-10-12',
     title: 'Dört yeni mega boss!',

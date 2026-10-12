@@ -1,5 +1,6 @@
 import {
   INK, at, blob, line, flat, glow, ellipse, circle, roundRect, smooth, poly, capsule, scallop, eye, darker, lighter,
+  curlPts, tube,
 } from './paint.js';
 import { track, bump } from './anim.js';
 import { baseActions, squash } from './monsters.js';
@@ -8,7 +9,8 @@ import { baseActions, squash } from './monsters.js';
 // Same conventions as monsters.js: drawn facing +x, mirrored by the renderer, colors from
 // config (`body`, `accent`). Extra fields the renderer reads:
 //   bossScale  drawing scale in battle (ordinary bosses use 1.5)
-//   special    which attack effect plays when its hit lands ('slam', 'leaves', 'crystals')
+//   special    which attack effect plays when its hit lands ('slam', 'leaves', 'crystals',
+//              'sting', 'iceblock', 'eruption'); draws may report `out.muzzle` where it starts
 
 const GOLD = '#f4b836';
 const BONE = '#f2ead8';
@@ -371,6 +373,305 @@ export const golem = {
         line(ctx, (c) => { c.moveTo(0, -1.5 + P.mouth * 1.5); c.lineTo(4, -2.5); c.lineTo(8, -1 + P.mouth * 1.5); c.lineTo(11, -2); }, INK, 1.8);
       });
       at(ctx, 20, -58, P.arm, () => stoneFist(ctx, stone, cry, false));
+    });
+  },
+};
+
+// Reports where a boss's special attack starts (device pixels), like the pets' muzzles.
+function mark(out, ctx, x, y) {
+  if (!out) return;
+  const m = ctx.getTransform();
+  out.muzzle = { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f };
+}
+
+// ---- Akrep Kral: a crowned giant scorpion with a venom sting ----
+
+function pincer(ctx, shell, open, back) {
+  blob(ctx, capsule(0, 0, 14, -4, 4.4, 4), shell, { depth: 1.2 });
+  at(ctx, 14, -4, -0.3, () => {
+    blob(ctx, capsule(0, 0, 10, 0, 4, 3.6), shell, { depth: 1 });
+    at(ctx, 12, 0, 0, () => {
+      blob(ctx, (c) => { c.moveTo(-3, 4); c.quadraticCurveTo(6, 10, 18, 2 + open * 4); c.quadraticCurveTo(8, 2, -3, -2); c.closePath(); }, shell, { depth: 1.2 });
+      blob(ctx, (c) => { c.moveTo(-3, -4); c.quadraticCurveTo(8, -12 - open * 4, 18, -4 - open * 6); c.quadraticCurveTo(8, -3, -3, 2); c.closePath(); }, back ? shell : lighter(shell, 0.1), { depth: 1.6 });
+    });
+  });
+}
+
+export const scorpionKing = {
+  height: 70,
+  bossScale: 1.2,
+  standOff: 22,
+  special: 'sting',
+  rest: { ...REST },
+  idle: (t) => ({
+    y: -Math.abs(Math.sin(t * 3)) * 1,
+    sq: 1 + Math.sin(t * 6) * 0.015,
+    lean: Math.sin(t * 1.2) * 0.03,
+    arm: Math.sin(t * 2.2) * 0.15,
+    club: Math.sin(t * 1.6) * 0.12,
+    wob: t,
+    glow: 0.5 + Math.sin(t * 4) * 0.3,
+    blink: t % 3.4 < 0.12 ? 1 : 0,
+  }),
+  actions: {
+    ...baseActions,
+    enter: bossEnter,
+    // Tail drawn back, claws wide.
+    windup: {
+      dur: 1.4, hold: true, channel: 'body',
+      pose: (p) => ({
+        x: track(p, [[0, 0], [0.25, -6, 'out']]),
+        lean: track(p, [[0, 0], [0.25, -0.1, 'out']]),
+        club: track(p, [[0, 0], [0.25, -0.7, 'out']]) + Math.sin(p * 34) * 0.05,
+        arm: track(p, [[0, 0], [0.25, 1, 'out']]),
+        mouth: 1,
+      }),
+    },
+    // The sting stabs forward over the head.
+    attack: {
+      dur: 0.45, channel: 'body',
+      pose: (p) => ({
+        x: track(p, [[0, -6], [0.25, 8, 'in'], [0.6, 8], [1, 0]]),
+        lean: track(p, [[0, -0.1], [0.25, 0.12, 'in'], [0.6, 0.12], [1, 0]]),
+        club: track(p, [[0, -0.7], [0.25, 1.1, 'in'], [0.6, 1.1], [1, 0]]),
+        arm: track(p, [[0, 1], [0.3, 0.2], [1, 0]]),
+        mouth: bump(p, 0.1, 0.5),
+      }),
+    },
+  },
+  draw(ctx, P, look, out) {
+    const shell = look.colors.body;
+    const gold = look.colors.accent;
+    const dark = darker(shell, 0.3);
+    const venom = '#8ae04a';
+    squash(ctx, P, () => {
+      // Far legs and claw.
+      for (let i = 0; i < 3; i++) {
+        const x = -16 + i * 13;
+        const k = Math.sin(P.wob * 8 + i * 1.7) * 2;
+        blob(ctx, capsule(x, -16, x - 10 + k, -28, 2.6, 2.4), dark, { depth: 0.6, ow: 1.8 });
+        blob(ctx, capsule(x - 10 + k, -28, x - 16 + k, -1, 2.4, 1.4), dark, { depth: 0.6, ow: 1.8 });
+      }
+      at(ctx, 20, -24, -0.35 - P.arm * 0.3, () => pincer(ctx, dark, P.arm, true), 1.15);
+      // The tail arching over the back, ending in the sting.
+      const tail = curlPts(-30, -20, -0.25 + P.club * 0.4, 84, 2.5 + P.club * 0.8, 0, 7);
+      for (let i = tail.length - 1; i >= 0; i--) {
+        const [x, y] = tail[i];
+        const r = 9.4 - i * 0.6;
+        blob(ctx, ellipse(x, y, r, r * 0.85), i % 2 ? shell : lighter(shell, 0.08), { depth: 1.6, ow: 2 });
+      }
+      const [sx, sy] = tail[tail.length - 1];
+      const [px, py] = tail[tail.length - 2];
+      at(ctx, sx, sy, Math.atan2(sy - py, sx - px) + Math.PI / 2, () => {
+        blob(ctx, (c) => { c.moveTo(-6, 0); c.quadraticCurveTo(-8, 10, 0, 18); c.quadraticCurveTo(8, 10, 6, 0); c.closePath(); }, gold, { depth: 1.4 });
+        glow(ctx, 0, 16, 10, venom, 0.3 + P.glow * 0.4);
+        flat(ctx, circle(0, 19 + (P.wob * 30) % 5, 1.6), venom, 0.9);
+        mark(out, ctx, 0, 18);
+      });
+      // Body segments, then the head with its crown.
+      for (let i = 0; i < 4; i++) blob(ctx, ellipse(-24 + i * 9, -18, 9, 9 - i * 0.4), i % 2 ? shell : lighter(shell, 0.06), { depth: 2.4 });
+      blob(ctx, smooth([[2, -8], [0, -24], [12, -30], [28, -28], [36, -18], [32, -8], [16, -6]], 0.9), shell, { depth: 3 });
+      line(ctx, (c) => { c.moveTo(6, -26); c.quadraticCurveTo(18, -22, 30, -24); }, dark, 1.6);
+      for (const [x, y, r] of [[26, -22, 2.6], [31, -21, 2.2], [22, -25, 1.6]]) {
+        flat(ctx, circle(x, y, r * (1 - P.blink * 0.7)), '#1a0a0a');
+        flat(ctx, circle(x - 0.6, y - 0.6, r * 0.35), '#ff6a3a');
+      }
+      blob(ctx, poly([[32, -12], [40, -8 + P.mouth * 3], [33, -8]]), dark, { ow: 1.4, depth: 0.5 });
+      at(ctx, 16, -30, 0.15, () => {
+        blob(ctx, poly([[-9, 0], [-10, -10], [-4, -5], [0, -13], [4, -5], [10, -10], [9, 0]]), GOLD, { depth: 1.6, ow: 1.8 });
+        flat(ctx, circle(0, -6, 1.8), '#e0413b');
+      });
+      // Near legs and the big claw in front.
+      for (let i = 0; i < 3; i++) {
+        const x = -12 + i * 13;
+        const k = Math.sin(P.wob * 8 + i * 1.7 + 1) * 2;
+        blob(ctx, capsule(x, -12, x + 6 + k, -24, 2.8, 2.6), shell, { depth: 0.8, ow: 1.8 });
+        blob(ctx, capsule(x + 6 + k, -24, x + 12 + k, -1, 2.6, 1.4), shell, { depth: 0.8, ow: 1.8 });
+      }
+      at(ctx, 26, -16, -0.1 - P.arm * 0.4, () => pincer(ctx, shell, P.arm, false), 1.3);
+    });
+  },
+};
+
+// ---- Yeti: a horned snow giant that hurls blocks of ice ----
+
+const FUR_BODY = scallop(2, -52, 31, 34, 16, 0.26, seeded(41));
+const FUR_HEAD = scallop(0, -2, 17, 16, 11, 0.3, seeded(43));
+
+function iceBlock(ctx, r) {
+  glow(ctx, 0, 0, r * 1.4, '#bff0ff', 0.35);
+  blob(ctx, poly([[-r, -r * 0.5], [-r * 0.4, -r], [r * 0.7, -r * 0.8], [r, r * 0.1], [r * 0.5, r * 0.9], [-r * 0.8, r * 0.7]]), '#a8e4ff', { depth: 3, light: '#ffffff', ow: 2 });
+  line(ctx, (c) => { c.moveTo(-r * 0.5, -r * 0.6); c.lineTo(r * 0.2, -r * 0.1); c.lineTo(r * 0.1, r * 0.5); }, '#ffffff', 1.4, 0.8);
+}
+
+export const yeti = {
+  height: 94,
+  bossScale: 1.1,
+  standOff: 14,
+  special: 'iceblock',
+  rest: { ...REST, arm: 0.2, arm2: 0.35 },
+  idle: (t) => ({
+    y: -Math.abs(Math.sin(t * 2)) * 1.6,
+    sq: 1 + Math.sin(t * 4) * 0.02,
+    lean: Math.sin(t * 1) * 0.04,
+    arm: 0.2 + Math.sin(t * 2) * 0.1,
+    arm2: 0.35 + Math.sin(t * 2 + 1) * 0.1,
+    wob: t,
+    blink: t % 4 < 0.14 ? 1 : 0,
+  }),
+  actions: {
+    ...baseActions,
+    enter: bossEnter,
+    // A block of ice lifted over the head.
+    windup: {
+      dur: 1.4, hold: true, channel: 'body',
+      pose: (p) => ({
+        x: track(p, [[0, 0], [0.25, -6, 'out']]),
+        lean: track(p, [[0, 0], [0.25, -0.18, 'out']]),
+        arm: track(p, [[0, 0], [0.25, -3, 'out']]),
+        arm2: track(p, [[0, 0], [0.25, -3.1, 'out']]),
+        glow: track(p, [[0, 0], [0.12, 1]]),
+        mouth: 1,
+      }),
+    },
+    // Thrown; the block leaves the hands at p 0.28.
+    attack: {
+      dur: 0.55, channel: 'body',
+      pose: (p) => ({
+        x: track(p, [[0, -6], [0.28, 10, 'in'], [0.65, 10], [1, 0]]),
+        lean: track(p, [[0, -0.18], [0.28, 0.24, 'in'], [0.65, 0.24], [1, 0]]),
+        arm: track(p, [[0, -3], [0.28, -1.2, 'in'], [0.65, -1.2], [1, 0]]),
+        arm2: track(p, [[0, -3.1], [0.28, -1.4, 'in'], [0.65, -1.4], [1, 0]]),
+        glow: p < 0.27 ? 1 : 0,
+        mouth: bump(p, 0.1, 0.5),
+      }),
+    },
+  },
+  draw(ctx, P, look, out) {
+    const fur = look.colors.body;
+    const skin = look.colors.accent;
+    const shade = darker(fur, 0.15);
+    const furArm = (back) => {
+      blob(ctx, capsule(0, 0, 0, 24, 10, 9), back ? shade : fur, { depth: 2, ink: darker(fur, 0.6) });
+      blob(ctx, circle(0, 28, 9), skin, { depth: 1.6 });
+      line(ctx, (c) => { c.moveTo(-4, 32); c.lineTo(-4, 36); c.moveTo(1, 33); c.lineTo(1, 37); c.moveTo(6, 32); c.lineTo(6, 35); }, darker(skin, 0.4), 1.4);
+    };
+    squash(ctx, P, () => {
+      at(ctx, -18, -70, 0.25 + P.arm2, () => furArm(true));
+      // Legs and big feet.
+      for (const [x, c] of [[-12, shade], [12, fur]]) {
+        blob(ctx, capsule(x, -34, x, -10, 10, 9), c, { depth: 1.6 });
+        blob(ctx, ellipse(x + 4, -5, 13, 6), skin, { depth: 1.2 });
+      }
+      // Shaggy round body.
+      blob(ctx, FUR_BODY, fur, { depth: 5, light: '#ffffff', ink: darker(fur, 0.6) });
+      flat(ctx, ellipse(6, -44, 15, 19), '#ffffff', 0.55);
+      line(ctx, (c) => { for (const [x, y] of [[-16, -62], [-20, -44], [14, -70], [18, -34], [-6, -28]]) { c.moveTo(x, y); c.quadraticCurveTo(x + 3, y + 4, x + 1, y + 8); } }, darker(fur, 0.25), 1.4, 0.8);
+      // Head: blue face, curled horns, angry brows and fangs.
+      at(ctx, 6, -82, P.lean * 0.4, () => {
+        for (const s of [-1, 1]) {
+          blob(ctx, (c) => { c.moveTo(s * 8, -12); c.quadraticCurveTo(s * 22, -20, s * 20, -32); c.quadraticCurveTo(s * 14, -22, s * 4, -16); c.closePath(); }, '#d8c8a8', { depth: 1.2 });
+        }
+        blob(ctx, FUR_HEAD, fur, { depth: 3, light: '#ffffff', ink: darker(fur, 0.6) });
+        blob(ctx, ellipse(5, 2, 11, 10), skin, { depth: 2 });
+        eye(ctx, 1, -1, 3.4, { lx: 0.7, blink: P.blink, angry: 1, white: '#e8f8ff' });
+        eye(ctx, 10, -1, 3, { lx: 0.7, blink: P.blink, angry: 1, white: '#e8f8ff' });
+        blob(ctx, (c) => { c.moveTo(-1, 6); c.quadraticCurveTo(6, 10 + P.mouth * 5, 13, 6); c.quadraticCurveTo(6, 8, -1, 6); c.closePath(); }, '#2a1a3a', { ow: 1.4, shade: false, noLight: true });
+        blob(ctx, poly([[1, 6.4], [2.4, 10], [3.6, 6.8]]), '#ffffff', { ow: 1, depth: 0.3, noLight: true });
+        blob(ctx, poly([[9, 6.6], [10.4, 10], [11.6, 6.4]]), '#ffffff', { ow: 1, depth: 0.3, noLight: true });
+      });
+      // Front arm; the ice block rides above the head while lifted.
+      at(ctx, 20, -70, P.arm, () => {
+        furArm(false);
+        if (P.glow > 0.5) {
+          at(ctx, -4, 44, -P.arm, () => { iceBlock(ctx, 18); mark(out, ctx, 0, 0); });
+        } else {
+          mark(out, ctx, 0, 30);
+        }
+      });
+    });
+  },
+};
+
+// ---- Lav Yılanı: a basalt serpent rising out of a lava pool ----
+
+export const lavaSerpent = {
+  height: 100,
+  bossScale: 1.05,
+  special: 'eruption',
+  rest: { ...REST },
+  idle: (t) => ({
+    lean: Math.sin(t * 1.4) * 0.05,
+    arm: Math.sin(t * 1.4) * 0.15,
+    wob: t,
+    glow: 0.4 + Math.sin(t * 3) * 0.2,
+    blink: t % 4.2 < 0.13 ? 1 : 0,
+  }),
+  actions: {
+    ...baseActions,
+    enter: bossEnter,
+    // Rears back, hood flared, the lava under it boiling.
+    windup: {
+      dur: 1.4, hold: true, channel: 'body',
+      pose: (p) => ({
+        x: track(p, [[0, 0], [0.25, -6, 'out']]),
+        arm: track(p, [[0, 0], [0.25, -0.6, 'out']]) + Math.sin(p * 30) * 0.05,
+        glow: track(p, [[0, 0], [1, 1]]),
+        mouth: track(p, [[0, 0], [0.3, 0.8]]),
+      }),
+    },
+    // Strikes down: the lava answers from the ground.
+    attack: {
+      dur: 0.5, channel: 'body',
+      pose: (p) => ({
+        x: track(p, [[0, -6], [0.25, 10, 'in'], [0.6, 10], [1, 0]]),
+        arm: track(p, [[0, -0.6], [0.25, 0.7, 'in'], [0.6, 0.7], [1, 0]]),
+        glow: track(p, [[0, 1], [0.4, 0.5], [1, 0]]),
+        mouth: track(p, [[0, 0.8], [0.25, 1.2], [0.6, 1], [1, 0]]),
+      }),
+    },
+  },
+  draw(ctx, P, look, out) {
+    const rock = look.colors.body;
+    const lava = look.colors.accent;
+    const g = Math.max(0, Math.min(1, P.glow));
+    squash(ctx, P, () => {
+      // The lava pool it rises from.
+      glow(ctx, 0, -4, 46, lava, 0.35 + g * 0.3);
+      blob(ctx, ellipse(0, -2, 36, 7), lava, { depth: 1.4, light: '#ffe07a', ow: 2 });
+      for (let i = 0; i < 3; i++) {
+        const k = (P.wob * 0.9 + i * 0.33) % 1;
+        flat(ctx, circle(-20 + i * 18, -4 - k * 8, 2.4 * (1 - k)), '#ffe07a', 1 - k);
+      }
+      // The body: a thick coil, cracks glowing with lava.
+      const body = curlPts(-6, -2, 0.25, 92, -0.35 + P.arm * 1.3, P.wob * 1.5, 10);
+      tube(ctx, body, 15, 9, rock, { depth: 3 });
+      line(ctx, (c) => { c.moveTo(body[0][0], body[0][1]); for (let i = 1; i < body.length; i++) c.lineTo(body[i][0], body[i][1]); }, lava, 2.6, 0.5 + g * 0.5);
+      for (let i = 1; i < body.length - 1; i += 2) {
+        const [x, y] = body[i];
+        flat(ctx, circle(x - 3, y - 2, 2.4), lighter(lava, 0.3), 0.6 + g * 0.4);
+      }
+      // Head with a flaming hood.
+      const [hx, hy] = body[body.length - 1];
+      const [px, py] = body[body.length - 2];
+      at(ctx, hx, hy, Math.atan2(hy - py, hx - px) * 0.4, () => {
+        for (let i = 0; i < 5; i++) {
+          const a = -1.2 + i * 0.4;
+          const len = 18 + Math.sin(P.wob * 6 + i) * 3;
+          blob(ctx, (c) => { c.moveTo(-6, 0); c.quadraticCurveTo(-6 + Math.sin(a) * len * 0.6, -Math.cos(a) * len * 0.8, -8 + Math.sin(a) * len, -Math.cos(a) * len); c.quadraticCurveTo(-2, -4, -6, 0); c.closePath(); }, i % 2 ? lava : '#ffd060', { ow: 1.4, depth: 0.8 });
+        }
+        blob(ctx, smooth([[-10, 6], [-12, -6], [-2, -12], [14, -9], [24, -3], [22, 5], [8, 9]], 0.85), rock, { depth: 2.6 });
+        line(ctx, (c) => { c.moveTo(-6, -8); c.lineTo(2, -4); c.lineTo(0, 2); }, lava, 1.6, 0.8);
+        blob(ctx, (c) => { c.moveTo(4, 5); c.quadraticCurveTo(14, 9 + P.mouth * 7, 24, 4); c.quadraticCurveTo(14, 6, 4, 5); c.closePath(); }, '#3a0a0a', { ow: 1.6, shade: false, noLight: true });
+        if (P.mouth > 0.3) glow(ctx, 16, 7, 12, lava, 0.6);
+        blob(ctx, poly([[16, 4], [17.5, 10 + P.mouth * 3], [19, 4.4]]), '#fff6e0', { ow: 1, depth: 0.3, noLight: true });
+        const open = Math.max(0.15, 1 - P.blink * 0.85);
+        glow(ctx, 9, -4, 9, '#ffd060', 0.5);
+        blob(ctx, ellipse(9, -4, 3.6, 2.4 * open), '#ffe07a', { ow: 1.4, depth: 0.4, light: '#ffffff' });
+        if (open > 0.3) flat(ctx, roundRect(8.4, -6, 1.4, 4 * open, 0.7), INK);
+        line(ctx, (c) => { c.moveTo(4, -8); c.lineTo(15, -6); }, INK, 2.2);
+        mark(out, ctx, 20, 6);
+      }, 1.3);
     });
   },
 };

@@ -446,6 +446,14 @@ export function createRenderer(canvas) {
       const a = Math.random() * Math.PI * 2;
       const r = 44 * s;
       fx.particle({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r * 0.7, vx: -Math.cos(a) * r * 2, vy: -Math.sin(a) * r * 1.4, g: 0, life: 0.45, size: 2.4, kind: 'star', color: cols.accent });
+    } else if (kind === 'sting' && Math.random() < dt * 20) {
+      const m = enemy.out.muzzle ? toScene(enemy.out.muzzle.x, enemy.out.muzzle.y) : c;
+      fx.particle({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 20, vy: 20, g: 200, life: 0.5, size: 1.8, color: '#8ae04a' });
+    } else if (kind === 'iceblock' && Math.random() < dt * 16) {
+      const m = enemy.out.muzzle ? toScene(enemy.out.muzzle.x, enemy.out.muzzle.y) : c;
+      fx.particle({ x: m.x + (Math.random() - 0.5) * 30, y: m.y + (Math.random() - 0.5) * 20, vx: 0, vy: 30, g: 40, life: 0.6, size: 2, kind: 'star', color: '#e8f8ff' });
+    } else if (kind === 'eruption' && Math.random() < dt * 22) {
+      fx.particle({ x: enemyX() + (Math.random() - 0.5) * 60 * s, y: gy - 4, vx: (Math.random() - 0.5) * 30, vy: -60 - Math.random() * 60, g: 120, life: 0.6, size: 2.4, kind: 'ember', color: Math.random() < 0.5 ? cols.accent : '#ffd060' });
     } else if (kind === 'tentacle' && Math.random() < dt * 18) {
       fx.particle({ x: c.x + (Math.random() - 0.5) * 80 * s, y: gy - 4, vx: (Math.random() - 0.5) * 40, vy: -60 - Math.random() * 60, g: 260, life: 0.6, size: 2.2, color: '#9ad8f8' });
     } else if (kind === 'boulder' && Math.random() < dt * 10) {
@@ -511,6 +519,55 @@ export function createRenderer(canvas) {
     }
     // Where the boss's own drawing says the attack starts (its `muzzle`), in scene units.
     const muzzle = () => (e.out.muzzle ? toScene(e.out.muzzle.x, e.out.muzzle.y) : enemyCenter(e));
+    if (kind === 'sting') {
+      // A venom dart from the sting, splashing green on the hero.
+      later(0.1, () => {
+        const from = muzzle();
+        fx.shot({
+          x0: from.x, y0: from.y, x1: hx + 10, y1: gy - 40, kind: 'orb', color: '#8ae04a', arc: 30, dur: 0.22,
+          onHit: () => {
+            fx.impact(hx + 10, gy - 40, 1.4, '#8ae04a');
+            fx.burst(hx + 10, gy - 40, ['#8ae04a', '#c8ff8a', '#ffffff'], 14, 160);
+            for (let i = 0; i < 3; i++) fx.puff(hx + Math.random() * 30 - 10, gy - 30 - Math.random() * 20, 8, '#a8e07a', 0.6, -20);
+            shakeHard(0.2, 5);
+          },
+        });
+      });
+      return 0.32;
+    }
+    if (kind === 'iceblock') {
+      later(0.14, () => {
+        const from = muzzle();
+        fx.shot({
+          x0: from.x, y0: from.y, x1: hx + 8, y1: gy - 26, kind: 'ice', color: '#a8e4ff', arc: 40, dur: 0.3,
+          onHit: () => {
+            fx.impact(hx + 8, gy - 24, 1.8, '#bff0ff');
+            fx.burst(hx + 8, gy - 24, ['#a8e4ff', '#ffffff', '#6ac0f0'], 20, 220);
+            fx.ring(hx + 8, gy - 4, 8, 70, '#bff0ff', 0.45, 4);
+            for (let i = 0; i < 4; i++) fx.puff(hx + Math.random() * 40 - 15, gy - 6, 10, '#f4fbff', 0.6, -12);
+            shakeHard(0.3, 6);
+          },
+        });
+      });
+      return 0.46;
+    }
+    if (kind === 'eruption') {
+      // Lava bursts out of the ground in a line toward the hero.
+      const x0 = enemyX() - 30 * s;
+      for (let i = 1; i <= 5; i++) {
+        later(0.1 + i * 0.05, () => {
+          const x = x0 + (hx + 6 - x0) * (i / 5);
+          fx.spike(x, gy + 2, 18 + i * 4, 5 + i * 0.5, cols.accent, 0.5);
+          fx.burst(x, gy - 8, [cols.accent, '#ffd060', '#ffe07a'], 5, 150, 'ember');
+          if (i === 5) {
+            fx.impact(x, gy - 24, 1.8, '#ffb43a');
+            for (let k = 0; k < 4; k++) fx.puff(x + Math.random() * 30 - 15, gy - 20, 10, '#4a3a3a', 0.7, -26);
+            shakeHard(0.3, 6);
+          }
+        });
+      }
+      return 0.38;
+    }
     if (kind === 'tentacle') {
       // The whip cracks down on the hero: a splash and a cloud of ink.
       later(0.16, () => {

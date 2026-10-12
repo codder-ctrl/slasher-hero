@@ -1,6 +1,6 @@
 import { hero, hood, hat, helm } from './people.js';
 import { slime, bat, mushroom, skeleton, ghost, goblin } from './monsters.js';
-import { goblinChief, treant, golem } from './bosses.js';
+import { goblinChief, treant, golem, scorpionKing, yeti, lavaSerpent } from './bosses.js';
 import { minotaur, spiderQueen, kraken, cyclops, lich, blackDragon } from './megabosses.js';
 import { dog, cat, robot, drone, dragon, phoenix } from './pets.js';
 
@@ -9,7 +9,7 @@ import { dog, cat, robot, drone, dragon, phoenix } from './pets.js';
 export const ACTORS = {
   hero, hood, hat, helm,
   slime, bat, mushroom, skeleton, ghost, goblin,
-  goblinChief, treant, golem,
+  goblinChief, treant, golem, scorpionKing, yeti, lavaSerpent,
   minotaur, spiderQueen, kraken, cyclops, lich, blackDragon,
   dog, cat, robot, drone, dragon, phoenix,
 };

@@ -281,6 +281,22 @@ export const sfx = {
       noise(0.45, { vol: 0.22, f0: 500, f1: 3000, q: 1.2, attack: 0.15, delay: 0.08 });
       for (let i = 0; i < 6; i++) noise(0.06, { vol: 0.07, type: 'highpass', f0: 4000, delay: 0.15 + i * 0.05 });
       this.heroHit(0.48);
+    } else if (kind === 'sting') {
+      noise(0.12, { vol: 0.18, f0: 1200, f1: 4000, q: 1.6, delay: 0.06, attack: 0.03 });
+      tone(rnd(500, 600), 0.2, { type: 'triangle', vol: 0.08, slide: 0.5, delay: 0.32 });
+      noise(0.25, { vol: 0.16, f0: 1800, f1: 600, q: 2, delay: 0.32 });
+      this.heroHit(0.32);
+    } else if (kind === 'iceblock') {
+      noise(0.25, { vol: 0.14, f0: 500, f1: 2000, q: 1.2, delay: 0.12, attack: 0.05 });
+      noise(0.5, { vol: 0.35, type: 'highpass', f0: 3500, f1: 1500, delay: 0.44, wet: 0.4 });
+      for (let i = 0; i < 6; i++) tone(rnd(1800, 3200), 0.2, { vol: 0.04, delay: 0.46 + i * 0.03, wet: 0.5 });
+      tone(70, 0.4, { slide: 0.5, vol: 0.45, delay: 0.44 });
+      this.heroHit(0.46);
+    } else if (kind === 'eruption') {
+      for (let i = 1; i <= 5; i++) noise(0.18, { vol: 0.16, type: 'lowpass', f0: 900, f1: 200, delay: 0.1 + i * 0.05 });
+      noise(0.5, { vol: 0.25, f0: 300, f1: 1200, q: 0.8, delay: 0.2, attack: 0.05 });
+      tone(55, 0.5, { slide: 0.5, vol: 0.5, delay: 0.36 });
+      this.heroHit(0.38);
     } else if (kind === 'tentacle') {
       noise(0.2, { vol: 0.2, f0: 600, f1: 3200, q: 1.4, delay: 0.04, attack: 0.05 });
       noise(0.08, { vol: 0.35, type: 'highpass', f0: 2500, delay: 0.16 });
