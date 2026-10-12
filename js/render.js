@@ -446,6 +446,17 @@ export function createRenderer(canvas) {
       const a = Math.random() * Math.PI * 2;
       const r = 44 * s;
       fx.particle({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r * 0.7, vx: -Math.cos(a) * r * 2, vy: -Math.sin(a) * r * 1.4, g: 0, life: 0.45, size: 2.4, kind: 'star', color: cols.accent });
+    } else if (kind === 'tentacle' && Math.random() < dt * 18) {
+      fx.particle({ x: c.x + (Math.random() - 0.5) * 80 * s, y: gy - 4, vx: (Math.random() - 0.5) * 40, vy: -60 - Math.random() * 60, g: 260, life: 0.6, size: 2.2, color: '#9ad8f8' });
+    } else if (kind === 'boulder' && Math.random() < dt * 10) {
+      fx.particle({ x: c.x + (Math.random() - 0.5) * 30 * s, y: gy - enemy.def.height * 1.1 * s, vx: (Math.random() - 0.5) * 30, vy: 20, g: 300, life: 0.7, size: 2, kind: 'shard', color: '#8a8478' });
+    } else if (kind === 'curse' && Math.random() < dt * 26) {
+      const m = enemy.out.muzzle ? toScene(enemy.out.muzzle.x, enemy.out.muzzle.y) : c;
+      const a = Math.random() * Math.PI * 2;
+      fx.particle({ x: m.x + Math.cos(a) * 34, y: m.y + Math.sin(a) * 34, vx: -Math.cos(a) * 90, vy: -Math.sin(a) * 90, g: 0, life: 0.38, size: 2.4, kind: 'star', color: cols.accent });
+    } else if (kind === 'fire' && Math.random() < dt * 20) {
+      const m = enemy.out.muzzle ? toScene(enemy.out.muzzle.x, enemy.out.muzzle.y) : c;
+      fx.particle({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 30, vy: -30 - Math.random() * 30, g: -20, life: 0.5, size: 2 + Math.random() * 2, kind: 'ember', color: Math.random() < 0.5 ? cols.accent : '#ffd060' });
     } else if (kind === 'charge' && Math.random() < dt * 14) {
       // Snorting steam and hoof-scrape dust.
       fx.puff(enemyX() - 30 * s, gy - 3, 6 + Math.random() * 5, '#e8dcc0', 0.45, -14);
@@ -497,6 +508,72 @@ export function createRenderer(canvas) {
         }));
       }
       return 0.48;
+    }
+    // Where the boss's own drawing says the attack starts (its `muzzle`), in scene units.
+    const muzzle = () => (e.out.muzzle ? toScene(e.out.muzzle.x, e.out.muzzle.y) : enemyCenter(e));
+    if (kind === 'tentacle') {
+      // The whip cracks down on the hero: a splash and a cloud of ink.
+      later(0.16, () => {
+        fx.impact(hx + 10, gy - 30, 1.8, '#bff0ff');
+        fx.burst(hx + 10, gy - 20, ['#4aa8f0', '#bff0ff', '#ffffff'], 18, 220);
+        fx.ring(hx + 10, gy - 4, 8, 70, '#bff0ff', 0.45, 4);
+        for (let i = 0; i < 5; i++) fx.puff(hx + Math.random() * 40 - 10, gy - 20 - Math.random() * 40, 10, '#3a2a4a', 0.7, -10);
+        shakeHard(0.3, 7);
+      });
+      return 0.18;
+    }
+    if (kind === 'boulder') {
+      later(0.16, () => {
+        const from = muzzle();
+        fx.shot({
+          x0: from.x, y0: from.y, x1: hx + 8, y1: gy - 26, kind: 'rock', color: '#8a8478', arc: 46, dur: 0.32,
+          onHit: () => {
+            fx.impact(hx + 8, gy - 24, 2.2, '#ffe07a');
+            fx.burst(hx + 8, gy - 20, ['#8a8478', '#c8c2b4', '#5a564e'], 20, 230);
+            for (let i = 0; i < 6; i++) fx.puff(hx + Math.random() * 50 - 20, gy - 4, 12, '#e8e4dc', 0.6, -14);
+            shakeHard(0.4, 9);
+          },
+        });
+      });
+      return 0.5;
+    }
+    if (kind === 'curse') {
+      const n = 2 + (e.look.phase || 1);
+      for (let i = 0; i < n; i++) {
+        later(0.12 + i * 0.06, () => {
+          const from = muzzle();
+          fx.shot({
+            x0: from.x, y0: from.y, x1: hx + Math.random() * 16, y1: gy - 30 - Math.random() * 36,
+            kind: 'skull', color: cols.accent, arc: -20 - i * 10, dur: 0.32,
+            onHit: () => {
+              fx.ring(hx + 8, gy - 40, 4, 40, cols.accent, 0.35, 3);
+              fx.burst(hx + 8, gy - 40, [cols.accent, '#ffffff'], 6, 110, 'star');
+            },
+          });
+        });
+      }
+      return 0.5;
+    }
+    if (kind === 'fire') {
+      // A stream of fire from the jaws, then a burst on the hero.
+      for (let i = 0; i < 12; i++) {
+        later(0.14 + i * 0.025, () => {
+          const from = muzzle();
+          for (let k = 0; k < 4; k++) {
+            const tx = hx + 10 + Math.random() * 20;
+            const ty = gy - 30 - Math.random() * 30;
+            const d = 0.28 + Math.random() * 0.08;
+            fx.particle({ x: from.x, y: from.y, vx: (tx - from.x) / d, vy: (ty - from.y) / d, g: -40, life: d + 0.1, size: 3 + Math.random() * 4, kind: 'ember', color: k % 2 ? cols.accent : '#ffd060' });
+          }
+        });
+      }
+      later(0.42, () => {
+        fx.impact(hx + 10, gy - 40, 2, '#ffb43a');
+        fx.burst(hx + 10, gy - 40, [cols.accent, '#ffd060', '#ff3a2a'], 22, 200, 'ember');
+        for (let i = 0; i < 5; i++) fx.puff(hx + Math.random() * 40 - 10, gy - 30 - Math.random() * 30, 10, '#4a3a3a', 0.7, -24);
+        shakeHard(0.35, 7);
+      });
+      return 0.46;
     }
     if (kind === 'charge') {
       // Hooves pounding toward the hero, then the axe lands.

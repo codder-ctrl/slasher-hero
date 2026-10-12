@@ -5,6 +5,17 @@
 
 export const NEWS = [
   {
+    id: 'mega-bosses-all',
+    date: '2026-10-12',
+    title: 'Dört yeni mega boss!',
+    cover: 'scene:dragonlair:blackDragon',
+    body: [
+      'Haritanın kalan dört diyarı açıldı. Batık Liman’da korsan şapkalı Kraken dokunaçlarını savuruyor, Dev Dağı’nın zirvesinde Tepegöz kaya fırlatıyor.',
+      'Lanetli Kale’de Lich Kral lanetli kafatasları yağdırıyor, Ejder Yuvası’nda ise altın yığınlarının üstünde Kara Ejderha seni bekliyor.',
+      'Son iki boss ilk zaferde Efsanevi eşya veriyor; kupalarıyla altın, can, kritik ve tüm hasarın kalıcı olarak büyür. İyi şanslar!',
+    ],
+  },
+  {
     id: 'mega-bosses',
     date: '2026-10-12',
     title: 'Mega Bosslar uyandı!',

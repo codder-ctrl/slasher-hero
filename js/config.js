@@ -519,8 +519,28 @@ export const MEGA_BOSSES = [
     first: { elmas: 200, rarity: 2 },
     trophy: { kind: 'pet', base: 0.25, step: 0.08, name: 'Zehir Dişi' },
   },
-  { id: 'kraken', name: 'Kraken', land: 'Batık Liman', unlock: 300, soon: true, trophy: { kind: 'gold', base: 0.3, step: 0.1, name: 'Mürekkep Kesesi' } },
-  { id: 'cyclops', name: 'Tepegöz', land: 'Dev Dağı', unlock: 400, soon: true, trophy: { kind: 'hp', base: 0.3, step: 0.1, name: 'Dev Gözü' } },
-  { id: 'lich', name: 'Lich Kral', land: 'Lanetli Kale', unlock: 500, soon: true, trophy: { kind: 'critDmg', base: 0.5, step: 0.15, name: 'Lanetli Taç' } },
-  { id: 'dragon', name: 'Kara Ejderha', land: 'Ejder Yuvası', unlock: 600, soon: true, trophy: { kind: 'all', base: 0.25, step: 0.08, name: 'Ejder Kalbi' } },
+  {
+    id: 'kraken', name: 'Kraken', land: 'Batık Liman', theme: 'harbor', actor: 'kraken', unlock: 300,
+    colors: { body: '#c0485a', accent: '#f2c87a' },
+    first: { elmas: 250, rarity: 2 },
+    trophy: { kind: 'gold', base: 0.3, step: 0.1, name: 'Mürekkep Kesesi' },
+  },
+  {
+    id: 'cyclops', name: 'Tepegöz', land: 'Dev Dağı', theme: 'peak', actor: 'cyclops', unlock: 400,
+    colors: { body: '#8aa0b8', accent: '#7a4a2c' },
+    first: { elmas: 300, rarity: 2 },
+    trophy: { kind: 'hp', base: 0.3, step: 0.1, name: 'Dev Gözü' },
+  },
+  {
+    id: 'lich', name: 'Lich Kral', land: 'Lanetli Kale', theme: 'castle', actor: 'lich', unlock: 500,
+    colors: { body: '#3e3458', accent: '#6af0d0' },
+    first: { elmas: 400, rarity: 3 },
+    trophy: { kind: 'critDmg', base: 0.5, step: 0.15, name: 'Lanetli Taç' },
+  },
+  {
+    id: 'dragon', name: 'Kara Ejderha', land: 'Ejder Yuvası', theme: 'dragonlair', actor: 'blackDragon', unlock: 600,
+    colors: { body: '#3e3654', accent: '#ff7a2a' },
+    first: { elmas: 500, rarity: 3 },
+    trophy: { kind: 'all', base: 0.25, step: 0.08, name: 'Ejder Kalbi' },
+  },
 ];

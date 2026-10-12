@@ -281,6 +281,28 @@ export const sfx = {
       noise(0.45, { vol: 0.22, f0: 500, f1: 3000, q: 1.2, attack: 0.15, delay: 0.08 });
       for (let i = 0; i < 6; i++) noise(0.06, { vol: 0.07, type: 'highpass', f0: 4000, delay: 0.15 + i * 0.05 });
       this.heroHit(0.48);
+    } else if (kind === 'tentacle') {
+      noise(0.2, { vol: 0.2, f0: 600, f1: 3200, q: 1.4, delay: 0.04, attack: 0.05 });
+      noise(0.08, { vol: 0.35, type: 'highpass', f0: 2500, delay: 0.16 });
+      noise(0.5, { vol: 0.25, type: 'lowpass', f0: 1800, f1: 300, delay: 0.17 });
+      for (let i = 0; i < 6; i++) tone(rnd(500, 900), 0.1, { vol: 0.04, slide: 1.6, delay: 0.2 + i * 0.04 });
+      this.heroHit(0.18);
+    } else if (kind === 'boulder') {
+      noise(0.25, { vol: 0.16, f0: 400, f1: 1800, q: 1.2, delay: 0.14, attack: 0.05 });
+      tone(48, 0.7, { slide: 0.5, vol: 0.7, delay: 0.48 });
+      noise(0.6, { vol: 0.45, type: 'lowpass', f0: 900, f1: 100, delay: 0.48 });
+      for (let i = 0; i < 5; i++) noise(0.06, { vol: 0.1, type: 'bandpass', f0: rnd(1500, 3000), delay: 0.52 + i * 0.05 });
+      this.heroHit(0.5);
+    } else if (kind === 'curse') {
+      for (let i = 0; i < 4; i++) tone(rnd(200, 260), 0.4, { type: 'sawtooth', vol: 0.05, slide: 2.2, lp: 1600, delay: 0.1 + i * 0.06, wet: 0.6 });
+      noise(0.5, { vol: 0.12, f0: 800, f1: 2400, q: 3, delay: 0.1, wet: 0.6 });
+      ring(rnd(600, 700), 0.6, 0.05, 0.45);
+      this.heroHit(0.5);
+    } else if (kind === 'fire') {
+      noise(0.5, { vol: 0.35, f0: 300, f1: 1400, q: 0.8, delay: 0.12, attack: 0.06 });
+      noise(0.4, { vol: 0.2, type: 'lowpass', f0: 1200, f1: 400, delay: 0.3 });
+      tone(70, 0.6, { type: 'sawtooth', vol: 0.12, slide: 0.6, lp: 600, delay: 0.1 });
+      this.heroHit(0.46);
     } else if (kind === 'charge') {
       for (let i = 0; i < 5; i++) noise(0.07, { vol: 0.14, type: 'lowpass', f0: 600, delay: 0.02 + i * 0.035 });
       noise(0.18, { vol: 0.2, f0: 800, f1: 3000, q: 1.4, delay: 0.1, attack: 0.04 });

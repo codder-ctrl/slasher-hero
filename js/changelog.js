@@ -3,6 +3,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.0',
+    date: '2026-10-12',
+    notes: [
+      'Haritanın tüm diyarları açıldı! Dört yeni mega boss ve kendi arenaları:',
+      'Kraken (Batık Liman, 300. bölümden sonra): korsan şapkalı dev ahtapot, dokunaçla kırbaçlar. Kupası: altın.',
+      'Tepegöz (Dev Dağı, 400): bulutların üstündeki tek gözlü dev, kaya fırlatır. Kupası: can.',
+      'Lich Kral (Lanetli Kale, 500): uçan iskelet kral, lanetli kafatası büyüleri atar. Kupası: kritik çarpanı. İlk zaferde Efsanevi eşya!',
+      'Kara Ejderha (Ejder Yuvası, 600): ateş püskürten son boss. Kupası: tüm hasar. İlk zaferde Efsanevi eşya!',
+    ],
+  },
+  {
     version: '0.6.0',
     date: '2026-10-12',
     notes: [

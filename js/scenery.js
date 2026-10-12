@@ -66,6 +66,30 @@ const THEMES = {
     ground: '#3a3050', road: '#4c4064', speck: '#2a2240', front: '#1a1428', flower: [],
     weather: 'spores',
   },
+  harbor: {
+    sky: ['#0e1a30', '#1e3a5a', '#3a6a8a'], moon: '#e8f0ff',
+    far: '#2a4a68', farTop: null, mid: '#1e3a52', sea: '#2a6a8a', wood: '#6a4a32', tree: null,
+    ground: '#b8a27a', road: '#8a6a48', speck: '#8a7a5a', front: '#4a5a5a', flower: [],
+    weather: 'rain',
+  },
+  peak: {
+    sky: ['#4a7ad0', '#a0c4f0', '#eef6ff'], sun: '#ffffff',
+    far: '#9ab0cc', farTop: '#ffffff', mid: '#7a8ca4', cloud: '#ffffff', tree: null,
+    ground: '#d8e4f0', road: '#a8b4c4', speck: '#8a98aa', front: '#6a7a8e', flower: [],
+    weather: 'snow',
+  },
+  castle: {
+    sky: ['#120a1e', '#2a1640', '#5a2a5a'], moon: '#f0d8ff',
+    far: '#1e1428', farTop: null, mid: '#2a2034', window: '#9aff7a', tree: null,
+    ground: '#3a3a3a', road: '#4e4a52', speck: '#2a2a2e', front: '#1a1820', flower: [],
+    weather: 'wisps',
+  },
+  dragonlair: {
+    sky: ['#1a0808', '#3a1212', '#6a2418'], ceiling: '#2a1414', lava: '#ff7a2a',
+    far: '#3a1a18', farTop: null, mid: '#4a2420', gold: '#f6c03a', tree: null,
+    ground: '#4a3030', road: '#5e3c38', speck: '#2e1a1a', front: '#1e1010', flower: [],
+    weather: 'embers',
+  },
 };
 
 export const THEME_IDS = Object.keys(THEMES);
@@ -208,10 +232,10 @@ function ground(g, t, rand, w, h, gy, theme) {
   // Foreground clumps that frame the bottom edge.
   for (let x = -6; x < w + 20; x += 28 + rand() * 30) {
     const y = h + 4;
-    if (theme === 'cave' || theme === 'volcano' || theme === 'desert' || theme === 'labyrinth' || theme === 'lair') rock(g, rand, x, y, 1.4 + rand(), t.front);
+    if (theme !== 'meadow' && theme !== 'forest' && theme !== 'ice') rock(g, rand, x, y, 1.4 + rand(), t.front);
     else blob(g, scallop(x, y, 16 + rand() * 8, 8 + rand() * 4, 7, 0.45, rand), t.front, { ow: 1.8, depth: 3 });
   }
-  if (theme === 'volcano') {
+  if (theme === 'volcano' || theme === 'dragonlair') {
     // Glowing cracks in the basalt.
     for (let i = 0; i < w / 50; i++) {
       const x = rand() * w;
@@ -240,7 +264,7 @@ export function paintBackdrop(g, theme, w, h, gy, seed = 1) {
     for (let i = 0; i < 26; i++) flat(g, circle(rand() * w, rand() * (horizon - 60), 0.5 + rand() * 0.8), '#ffffff', 0.4 + rand() * 0.5);
   }
 
-  if (theme === 'labyrinth' || theme === 'lair') {
+  if (['labyrinth', 'lair', 'harbor', 'peak', 'castle', 'dragonlair'].includes(theme)) {
     arenaBackdrop(g, theme, t, rand, w, h, gy, horizon);
   } else if (theme === 'cave') {
     // Back wall, hanging stalactites and crystal clusters.
@@ -376,6 +400,18 @@ function cobweb(g, x, y, r, a0, a1, color) {
   }, color, 1, 0.55);
 }
 
+// A mound of gold coins with a few gems.
+function hoard(g, rand, x, y, s, gold) {
+  blob(g, (c) => { c.moveTo(x - 30 * s, y); c.quadraticCurveTo(x, y - 36 * s, x + 30 * s, y); c.closePath(); }, gold, { ow: 1.6, depth: 4, light: '#fff2a8' });
+  for (let i = 0; i < 10; i++) {
+    const cx = x + (rand() - 0.5) * 44 * s;
+    const cy = y - rand() * 18 * s;
+    if (cy > y - 2) continue;
+    line(g, ellipse(cx, cy, 3 * s, 1.6 * s), '#c88a1a', 1, 0.8);
+  }
+  for (const col of ['#e0413b', '#4aa8f0', '#5ae0a0']) blob(g, circle(x + (rand() - 0.5) * 30 * s, y - 6 * s - rand() * 10 * s, 2.6 * s), col, { ow: 1.2, depth: 0.6, light: '#ffffff' });
+}
+
 function arenaBackdrop(g, theme, t, rand, w, h, gy, horizon) {
   if (theme === 'labyrinth') {
     glow(g, w * 0.5, horizon - 60, 120, '#ffb46a', 0.35);
@@ -388,6 +424,72 @@ function arenaBackdrop(g, theme, t, rand, w, h, gy, horizon) {
     mazeWall(g, rand, -30, horizon - 120, 70 + rand() * 20, horizon + 22, t.wall);
     mazeWall(g, rand, w - 60 - rand() * 20, horizon - 128, 110, horizon + 22, t.wall);
     for (const tx of [w * 0.12, w * 0.5, w * 0.88]) torch(g, tx, horizon + 20, 1, t.torch);
+  } else if (theme === 'harbor') {
+    // Night sea, a wrecked galleon and a broken pier.
+    flat(g, roundRect(-10, horizon - 30, w + 20, 60, 0), t.sea);
+    line(g, (c) => { for (let y = horizon - 24; y < horizon + 20; y += 9) for (let x = rand() * 20 - 20; x < w; x += 30) { c.moveTo(x, y); c.quadraticCurveTo(x + 7, y - 3, x + 14, y); } }, lighter(t.sea, 0.3), 1.4, 0.6);
+    flat(g, ellipse(w * 0.78, horizon - 22, 30, 4), '#e8f0ff', 0.25);
+    at(g, w * 0.3, horizon - 6, -0.2, () => {
+      blob(g, (c) => { c.moveTo(-60, -10); c.lineTo(50, -16); c.quadraticCurveTo(46, 10, 20, 14); c.lineTo(-44, 14); c.quadraticCurveTo(-58, 4, -60, -10); c.closePath(); }, '#3a2a24', { ow: 1.6, depth: 4 });
+      line(g, (c) => { c.moveTo(-50, -2); c.lineTo(40, -6); c.moveTo(-46, 6); c.lineTo(30, 4); }, '#5a4030', 1.2);
+      blob(g, roundRect(-6, -90, 4, 78, 1.4), '#4a3428', { ow: 1.4, depth: 0.6 });
+      blob(g, (c) => { c.moveTo(-2, -84); c.quadraticCurveTo(26, -70, 20, -40); c.lineTo(10, -46); c.lineTo(14, -58); c.lineTo(-2, -50); c.closePath(); }, '#c8b89a', { ow: 1.4, depth: 2 });
+      flat(g, circle(-30, -2, 2.4), '#2a1a14');
+      flat(g, circle(-14, -4, 2.4), '#2a1a14');
+    });
+    for (let i = 0; i < 6; i++) {
+      const x = w * 0.55 + i * 22;
+      blob(g, roundRect(x, horizon - 18 - rand() * 10, 6, 46, 2), t.wood, { ow: 1.6, depth: 1.4 });
+    }
+    blob(g, roundRect(w * 0.55 - 4, horizon - 12, w * 0.5, 6, 2), lighter(t.wood, 0.1), { ow: 1.6, depth: 1.4 });
+  } else if (theme === 'peak') {
+    // Above the clouds: jagged snowy peaks and a sea of clouds.
+    mountains(g, t, rand, w, horizon - 10, 120, t.far, t.farTop, 0);
+    for (let x = -20; x < w + 40; x += 26 + rand() * 20) blob(g, scallop(x, horizon + 4, 34 + rand() * 20, 14 + rand() * 6, 8, 0.5, rand), t.cloud, { ow: 1.4, depth: 4, shade: '#d4e2f2', ink: '#8aa2c0' });
+    mountains(g, t, rand, w, horizon + 14, 50, t.mid, t.farTop, 1.6);
+  } else if (theme === 'castle') {
+    // A haunted castle with lit windows over a graveyard.
+    mountains(g, t, rand, w, horizon + 4, 40, t.far, null, 0);
+    const cx = w * 0.5;
+    const towers = [[-70, 70, 18], [-36, 104, 22], [0, 86, 30], [40, 118, 22], [74, 64, 16]];
+    for (const [dx, hgt, tw] of towers) {
+      blob(g, roundRect(cx + dx - tw / 2, horizon - hgt, tw, hgt + 14, 1), t.mid, { ow: 1.6, depth: 3 });
+      blob(g, poly([[cx + dx - tw / 2 - 4, horizon - hgt], [cx + dx, horizon - hgt - tw * 1.2], [cx + dx + tw / 2 + 4, horizon - hgt]]), darker(t.mid, 0.2), { ow: 1.6, depth: 2 });
+      for (let k = 0; k < 3; k++) {
+        const wy = horizon - hgt + 14 + k * 18;
+        if (wy > horizon - 6 || rand() < 0.3) continue;
+        glow(g, cx + dx, wy, 7, t.window, 0.4);
+        blob(g, roundRect(cx + dx - 2.4, wy - 4, 4.8, 8, 2.4), t.window, { ow: 1, depth: 0.4, noLight: true });
+      }
+    }
+    blob(g, roundRect(cx - 90, horizon - 36, 180, 50, 1), darker(t.mid, 0.1), { ow: 1.6, depth: 3 });
+    for (let x = cx - 90; x < cx + 88; x += 12) blob(g, roundRect(x, horizon - 42, 8, 8, 1), darker(t.mid, 0.1), { ow: 1.4, depth: 1 });
+    blob(g, (c) => { c.moveTo(cx - 12, horizon + 14); c.lineTo(cx - 12, horizon - 10); c.quadraticCurveTo(cx, horizon - 26, cx + 12, horizon - 10); c.lineTo(cx + 12, horizon + 14); c.closePath(); }, '#0e0a14', { ow: 1.4, shade: false, noLight: true });
+    hills(g, rand, w, horizon + 14, 24, '#262230');
+    for (let i = 0; i < 6; i++) {
+      const x = rand() * w;
+      const y = horizon + 14 + rand() * 6;
+      blob(g, (c) => { c.moveTo(x - 6, y); c.lineTo(x - 6, y - 12); c.quadraticCurveTo(x, y - 20, x + 6, y - 12); c.lineTo(x + 6, y); c.closePath(); }, '#6a6a74', { ow: 1.4, depth: 1.4 });
+      line(g, (c) => { c.moveTo(x, y - 14); c.lineTo(x, y - 6); c.moveTo(x - 3, y - 11); c.lineTo(x + 3, y - 11); }, '#3a3a44', 1.2);
+    }
+    for (let i = 0; i < 2; i++) {
+      const x = i ? w * 0.92 : w * 0.06;
+      line(g, (c) => { c.moveTo(x, horizon + 18); c.lineTo(x + 2, horizon - 40); c.moveTo(x + 1, horizon - 20); c.lineTo(x + 16, horizon - 34); c.moveTo(x + 2, horizon - 30); c.lineTo(x - 12, horizon - 46); }, '#1a1420', 4);
+    }
+  } else if (theme === 'dragonlair') {
+    // A volcanic cave with lava falls and piles of gold.
+    mountains(g, t, rand, w, horizon + 10, 110, t.far, null, 0);
+    for (const x of [w * 0.2, w * 0.82]) {
+      glow(g, x, horizon - 40, 40, t.lava, 0.45);
+      blob(g, (c) => { c.moveTo(x - 6, 20); c.quadraticCurveTo(x - 10, horizon - 40, x - 8, horizon + 10); c.lineTo(x + 8, horizon + 10); c.quadraticCurveTo(x + 10, horizon - 40, x + 6, 20); c.closePath(); }, t.lava, { ow: 1.4, depth: 2, light: '#ffe07a' });
+    }
+    blob(g, (c) => {
+      c.moveTo(-10, -10); c.lineTo(w + 10, -10); c.lineTo(w + 10, 26);
+      for (let x = w + 10; x > -10; x -= 16 + rand() * 18) { c.lineTo(x - 4, 30 + rand() * 30); c.lineTo(x - 12, 24 + rand() * 6); }
+      c.lineTo(-10, 26); c.closePath();
+    }, t.ceiling, { ow: 1.6, depth: 5 });
+    hills(g, rand, w, horizon + 14, 30, t.mid);
+    for (let i = 0; i < 4; i++) hoard(g, rand, 20 + rand() * (w - 40), horizon + 18 + rand() * 4, 0.8 + rand() * 0.5, t.gold);
   } else if (theme === 'lair') {
     // Webbed cave: a dark ceiling with hanging cocoons, webs in the corners, glowing eggs.
     mountains(g, t, rand, w, horizon + 10, 110, t.far, null, 0);
@@ -455,7 +557,7 @@ export function createWeather(theme, w, gy, seed = 1) {
   const kind = t.weather;
   const rand = mulberry32(seed * 31 + 7);
   const items = [];
-  const n = { clouds: 4, fireflies: 14, sparkles: 16, snow: 60, embers: 34, dust: 18, spores: 22 }[kind] || 0;
+  const n = { clouds: 4, fireflies: 14, sparkles: 16, snow: 60, embers: 34, dust: 18, spores: 22, rain: 70, wisps: 10 }[kind] || 0;
   for (let i = 0; i < n; i++) {
     items.push({
       x: rand() * w, y: rand() * gy, p: rand() * 6.28, s: 0.5 + rand(), r: rand(),
@@ -493,6 +595,17 @@ export function createWeather(theme, w, gy, seed = 1) {
           if (p.y < -4) { p.y = gy + 20; p.x = Math.random() * w; }
           glow(g, p.x, p.y, 4, '#ff8a3a', 0.5);
           flat(g, circle(p.x, p.y, 0.9 + p.r * 0.8), p.s > 1 ? '#ffe07a' : '#ff8a3a');
+        } else if (kind === 'rain') {
+          p.y += (220 + p.s * 80) * dt;
+          p.x -= 40 * dt;
+          if (p.y > gy + 20) { p.y = -10; p.x = Math.random() * (w + 60); }
+          line(g, (c) => { c.moveTo(p.x, p.y); c.lineTo(p.x - 2, p.y + 8); }, '#a8c8e8', 1, 0.5);
+        } else if (kind === 'wisps') {
+          const x = p.x + Math.sin(time * 0.5 + p.p) * 24;
+          const y = gy * 0.55 + p.y * 0.4 + Math.cos(time * 0.8 + p.p) * 10;
+          const a = 0.5 + 0.5 * Math.sin(time * 1.2 + p.p * 3);
+          glow(g, x, y, 12, '#9aff7a', 0.35 * a);
+          flat(g, circle(x, y, 1.6), '#e8ffd8', 0.5 + 0.4 * a);
         } else if (kind === 'spores') {
           p.y -= p.s * 6 * dt;
           if (p.y < -4) { p.y = gy + 10; p.x = Math.random() * w; }

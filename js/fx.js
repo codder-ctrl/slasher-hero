@@ -1,4 +1,4 @@
-import { INK, at, blob, line, flat, glow, ellipse, circle, roundRect, poly, scallop, star, darker, lighter, rgba } from './paint.js';
+import { INK, at, blob, line, flat, glow, ellipse, circle, roundRect, poly, scallop, smooth, star, darker, lighter, rgba } from './paint.js';
 import { ease } from './anim.js';
 
 // Short-lived effects shared by the battle and the dungeon: particles, smoke puffs, impact
@@ -152,6 +152,17 @@ export function createFx() {
             blob(g, poly([[2, -3], [9, 0], [2, 3]]), s.color, { ow: 1.2, depth: 0.6 });
             blob(g, poly([[-13, -3.4], [-8, 0], [-13, 3.4], [-11, 0]]), '#f4f0ea', { ow: 1, depth: 0.4, noLight: true });
           });
+        } else if (s.kind === 'rock') {
+          at(g, x, y, s.t * 9, () => {
+            blob(g, smooth([[-14, 1], [-11, -10], [-1, -14], [11, -10], [14, 1], [8, 12], [-7, 12]], 0.9), s.color, { ow: 2, depth: 3, light: '#c8c2b4' });
+            line(g, (c) => { c.moveTo(-4, -6); c.lineTo(1, -1); c.lineTo(0, 5); }, darker(s.color, 0.4), 1.4);
+          });
+        } else if (s.kind === 'skull') {
+          glow(g, x, y, 16, s.color, 0.55);
+          for (let j = 1; j <= 3; j++) flat(g, circle(x - Math.cos(a) * j * 6, y - Math.sin(a) * j * 6, 5 - j), s.color, 0.45 - j * 0.1);
+          blob(g, (c) => { c.arc(x, y - 1, 6, Math.PI * 0.95, Math.PI * 0.05); c.lineTo(x + 4, y + 6); c.lineTo(x - 4, y + 6); c.closePath(); }, lighter(s.color, 0.55), { ow: 1.4, depth: 1, light: '#ffffff' });
+          flat(g, circle(x - 2.4, y - 1, 1.8), INK);
+          flat(g, circle(x + 2.4, y - 1, 1.8), INK);
         } else if (s.kind === 'leaf') {
           at(g, x, y, a + s.t * 14, () => {
             blob(g, ellipse(0, 0, 8.4, 4), s.color, { ow: 1.4, depth: 1, light: '#ffffff' });

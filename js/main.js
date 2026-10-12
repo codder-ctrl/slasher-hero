@@ -91,11 +91,14 @@ function dispatch(events) {
         renderer.showBanner('MEGA ZAFER!', '#e0a020', 2);
         setTimeout(() => ui.showRaidWin(ev, state), 1300);
         break;
-      case 'raidLose':
+      case 'raidLose': {
         if (ev.why !== 'left') sfx.fail();
-        renderer.showBanner(ev.why === 'time' ? 'SÜRE DOLDU!' : ev.why === 'down' ? 'BAYILDIN!' : 'ARENADAN ÇIKTIN', '#6a3a5a', 1.4);
+        // A knockout waits for the boss's blow to land on screen.
+        const text = ev.why === 'time' ? 'SÜRE DOLDU!' : ev.why === 'down' ? 'BAYILDIN!' : 'ARENADAN ÇIKTIN';
+        setTimeout(() => renderer.showBanner(text, '#6a3a5a', 1.4), ev.why === 'down' ? 500 : 0);
         updateMusic();
         break;
+      }
       case 'elmas':
         ui.toast(ev.zoneBoss ? `Bölge bossu ilk kez yenildi: +${ev.amount} elmas` : `İlk boss zaferi: +${ev.amount} elmas`);
         break;
