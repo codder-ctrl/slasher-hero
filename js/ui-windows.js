@@ -1,16 +1,18 @@
-import { DAILY, MAIL, QUEST_BONUS, ACHIEVEMENTS } from './config.js';
+import { DAILY, MAIL, QUEST_BONUS, ACHIEVEMENTS, MEGA_BOSSES } from './config.js';
 import { CHANGELOG, VERSION } from './changelog.js';
 import { NEWS } from './news.js';
 import * as L from './logic.js';
 import { coverUrl } from './icons.js';
+import { createMapView } from './ui-map.js';
 
 // The top-right menu: a button under the version label opens a square bubble of shortcuts;
-// each opens a parchment window (Günlük Giriş, Posta, Lider Tablosu, Blog, Ayarlar).
+// each opens a parchment window (Harita, Günlük Giriş, Görevler, Posta, Lider Tablosu, Blog, Ayarlar).
 // Like the rest of the UI it never changes state itself: actions go through the handlers.
 
 const $ = (id) => document.getElementById(id);
 
 const WINDOWS = {
+  map: { title: 'Mega Boss Haritası', icon: 'mapIcon' },
   daily: { title: 'Günlük Giriş', icon: 'daily' },
   quests: { title: 'Görevler', icon: 'medal' },
   mail: { title: 'Posta', icon: 'mail' },
@@ -383,7 +385,8 @@ export function createWindows({ h, icon, make, set, fmt }) {
     return { root: el.settings, update() {} };
   }
 
-  const builders = { daily: dailyView, quests: questsView, mail: mailView, leaderboard: leaderboardView, blog: blogView, settings: settingsView };
+  const mapView = () => createMapView({ h, icon, make, set, fmt }, close);
+  const builders = { map: mapView, daily: dailyView, quests: questsView, mail: mailView, leaderboard: leaderboardView, blog: blogView, settings: settingsView };
 
   function open(name, opts) {
     setPop(false);
@@ -415,6 +418,7 @@ export function createWindows({ h, icon, make, set, fmt }) {
       blog: state.seen.version !== VERSION || unseenNews,
       leaderboard: false,
       settings: false,
+      map: state.raid.keys > 0 && !L.inRaid(state) && MEGA_BOSSES.some((m) => L.megaUnlocked(state, m)),
     };
     for (const b of items) b.classList.toggle('badge', flags[b.dataset.window]);
     el.btn.classList.toggle('badge', Object.values(flags).some(Boolean));

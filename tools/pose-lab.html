@@ -15,7 +15,7 @@
 // Open /tools/pose-lab.html?only=hero to look at one actor.
 import { ACTORS } from '../js/actors.js';
 import { createAnimator } from '../js/anim.js';
-import { ZONES, PETS, COMPANIONS } from '../js/config.js';
+import { ZONES, PETS, COMPANIONS, MEGA_BOSSES } from '../js/config.js';
 
 const params = new URLSearchParams(location.search);
 const only = params.get('only');
@@ -30,6 +30,10 @@ const rows = [];
 function looksFor(id) {
   const zoneEnemy = ZONES.flatMap((z) => z.enemies).find((e) => e.actor === id);
   if (zoneEnemy) return [{ colors: zoneEnemy.colors }, { colors: zoneEnemy.colors, boss: true }];
+  const mega = MEGA_BOSSES.find((m) => m.actor === id);
+  if (mega) return [1, 3].map((phase) => ({ colors: mega.colors, boss: true, mega: true, phase }));
+  const zoneBoss = ZONES.map((z) => z.boss).find((b) => b?.actor === id);
+  if (zoneBoss) return [zoneBoss.colors, ...zoneBoss.tours].map((colors) => ({ colors, boss: true }));
   const pet = PETS.find((p) => p.actor === id);
   if (pet) return pet.forms.map((f, i) => ({ colors: f.colors, form: i + 1 }));
   const comp = COMPANIONS.filter((x) => x.actor === id);

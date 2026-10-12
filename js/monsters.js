@@ -106,13 +106,13 @@ const flee = {
   }),
 };
 
-const baseActions = { hurt, die, enter, attack, windup, flee };
+export const baseActions = { hurt, die, enter, attack, windup, flee };
 
-function squash(ctx, P, fn) {
+export function squash(ctx, P, fn) {
   at(ctx, P.x, P.y, 0, () => at(ctx, 0, 0, P.lean, fn, 2 - P.sq, P.sq));
 }
 
-function mouthShape(ctx, x, y, w, open, teeth = true) {
+export function mouthShape(ctx, x, y, w, open, teeth = true) {
   if (open > 0.15) {
     blob(ctx, ellipse(x, y + open * 2, w * 0.5, 1.5 + open * 4), '#5a1426', { ow: 1.6, shade: false, noLight: true });
     if (teeth) flat(ctx, poly([[x - w * 0.3, y - 0.2], [x - w * 0.15, y + 2.4], [x, y - 0.2]]), '#ffffff');

@@ -6,6 +6,7 @@
 //   node tools/sim.js --skip vitality,armor  never buys those upgrades
 //   node tools/sim.js --share 0.15         spends at most 15% of its gold on defense
 //   node tools/sim.js --curve              also prints HP, armor and boss hits per stage
+//   node tools/sim.js --mega               also prints how long the first mega boss would take
 //   node tools/sim.js --logic ../../piksel-savasci/js/logic.js   compare with another rule set
 //
 // The player taps at a steady rate (so it also interrupts boss wind-ups), buys the cheapest
@@ -32,6 +33,7 @@ const DEFENSE = new Set(['vitality', 'armor']);
 let spent = 0;
 let spentDefense = 0;
 const curve = [];
+const mega = [];
 
 function mulberry32(a) {
   return () => {
@@ -97,6 +99,13 @@ for (let t = 0; t <= HOURS * 3600 + DT; t += DT) {
     curve[state.maxStage] = { hp: L.heroMaxHp(state), takes: L.damageTakenMultiplier(L.heroArmor(state)), hit: L.attackDamage(state, { boss: true }, state.maxStage) };
   }
   for (const s of samples) if (at[s] === undefined && t >= s) at[s] = state.maxStage;
+  // Seconds the current build needs for the first mega boss at level 1 and 2 (taps + pet).
+  if (args.mega && C.MEGA_BOSSES && state.maxStage % 5 === 0 && !mega[state.maxStage]) {
+    const m = C.MEGA_BOSSES[0];
+    const crit = 1 + L.critChance(state) * (L.critMultiplier(state) - 1);
+    const dps = L.tapDamage(state) * crit * TAPS * L.comboMultiplier(state) + L.totalDps(state);
+    mega[state.maxStage] = [1, 2, 3].map((lv) => L.megaHp(m, lv) / dps);
+  }
 }
 
 const fmtT = (s) => (s === undefined ? '—' : s < 3600 ? `${(s / 60).toFixed(1)} dk` : `${(s / 3600).toFixed(2)} sa`);
@@ -104,6 +113,10 @@ console.log(`logic: ${args.logic || 'slasher-hero'} · ${TAPS} taps/s · skip: $
 if (args.curve) {
   console.log('stage  hp  takes  hpEff(hp/takes)  bossHit  hitsToDie');
   curve.forEach((c, s) => { if (c) console.log(`${s}	${Math.round(c.hp)}	${c.takes.toFixed(3)}	${Math.round(c.hp / c.takes)}	${Math.round(c.hit)}	${(c.hp / c.hit).toFixed(1)}`); });
+}
+if (args.mega) {
+  console.log(`mega boss ${C.MEGA_BOSSES[0].name}: seconds needed at Sv.1 / Sv.2 / Sv.3 (limit ${C.RAID.time})`);
+  mega.forEach((v, st) => { if (v && st >= 80) console.log(`  stage ${st}: ${v.map((x) => x.toFixed(0)).join(' / ')}`); });
 }
 console.log('time to stage: ' + marks.map((m) => `${m}: ${fmtT(reached[m])}`).join(' | '));
 console.log('stage at:      ' + samples.map((s) => `${fmtT(s)}: ${at[s]}`).join(' | '));

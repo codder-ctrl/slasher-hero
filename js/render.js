@@ -1,10 +1,11 @@
 import { ACTORS } from './actors.js';
 import { createAnimator } from './anim.js';
-import { at, blob, line, flat, glow, shadow, tint, circle, ellipse, star, roundRect, mix, darker, rgba, INK } from './paint.js';
+import { at, blob, line, flat, glow, shadow, tint, circle, ellipse, star, roundRect, mix, darker, lighter, rgba, INK } from './paint.js';
 import { paintBackdrop, createWeather } from './scenery.js';
 import { createFx } from './fx.js';
-import { PETS, ZONES, SPECIALS, ATTACK, COMBO, RARITIES } from './config.js';
-import { zoneIndex, formatNumber, totalDps, heroMaxHp, comboTier } from './logic.js';
+import { PETS, ZONES, ATTACK, COMBO, RARITIES, MEGA_BOSSES } from './config.js';
+import { zoneIndex, formatNumber, totalDps, heroMaxHp, comboTier, enemySpec, findMega } from './logic.js';
+import { BOSS_LAND } from './bosses.js';
 
 // The battle scene. Everything is vector-drawn every frame at the screen's real resolution:
 // the canvas is sized in device pixels and the scene is SCENE_H units tall, so it stays sharp
@@ -52,30 +53,41 @@ export function createRenderer(canvas) {
   let hitSound = () => {};
   let warcryPulse = 0;
   let lastState = null;
+  // A zone boss's special takes a moment to reach the hero; if that hit ends the fight, the
+  // next enemy waits until it has landed.
+  let hitDelay = 0.11;
+  let holdSync = 0;
+  let syncLater = false;
 
   const heroX = () => W / 2 - 48;
   const petX = () => W / 2 - 100;
-  const enemyX = () => W / 2 + 70;
+  // Big bosses can stand further back (`standOff` on the actor).
+  const enemyX = (e = enemy) => W / 2 + 70 + (e?.def.standOff || 0);
+
+  // Drawing scale of an enemy: zone bosses bring their own, other bosses are drawn at 1.5.
+  const sizeOf = (e) => (e.boss ? e.def.bossScale || 1.5 : 1);
 
   // Scene point an attack aims for on the current enemy.
   function enemyCenter(e = enemy) {
     if (!e) return { x: enemyX(), y: gy - 30 };
-    const s = e.boss ? 1.5 : 1;
+    const s = sizeOf(e);
     const P = e.anim.pose;
     // Enemies are mirrored: local +x (their front) points left on screen.
-    return { x: enemyX() - (P.x + 8) * s, y: gy + (P.y - e.def.height * 0.5) * s };
+    return { x: enemyX(e) - (P.x + 8) * s, y: gy + (P.y - e.def.height * 0.5) * s };
   }
 
   function makeEnemy(state) {
-    const zone = ZONES[zoneIndex(state.stage)];
     const v = state.enemy.variant;
-    const spec = v === 'goblin' ? SPECIALS.goblin : zone.enemies[state.enemy.kind] ?? zone.enemies[0];
+    const spec = enemySpec(state);
     const def = ACTORS[spec.actor];
-    const look = { colors: spec.colors, boss: state.enemy.boss, armored: v === 'armored', elite: v === 'elite' };
+    const look = {
+      colors: spec.colors, boss: state.enemy.boss, zoneBoss: !!spec.zoneBoss, mega: !!spec.mega, phase: state.enemy.phase || 1,
+      armored: v === 'armored', elite: v === 'elite',
+    };
     const anim = createAnimator(def, look);
     anim.play('enter');
     anim.update(0);
-    return { stage: state.stage, boss: state.enemy.boss, variant: v, def, look, anim, out: {}, flash: 0 };
+    return { stage: state.stage, boss: state.enemy.boss, variant: v, mega: state.enemy.mega || null, def, look, anim, out: {}, flash: 0 };
   }
 
   function syncPet(state) {
@@ -125,12 +137,18 @@ export function createRenderer(canvas) {
 
   function drawEnemy(e, dt, alpha = 1) {
     const P = e.anim.pose;
-    const s = e.boss ? 1.5 : 1;
+    const s = sizeOf(e);
     const a = Math.max(0, Math.min(1, P.alpha)) * alpha;
     if (a <= 0) return;
     const hover = e.def.hover || 0;
-    shadow(ctx, enemyX() + P.x * -s, gy + 1, (e.def.height * 0.42 + 4) * s * (hover ? 0.7 : 1), 0.3 * a);
-    if (e.boss) glow(ctx, enemyX(), gy - 4, 60, '#ff3a3a', 0.18 + 0.06 * Math.sin(time * 4));
+    shadow(ctx, enemyX(e) + P.x * -s, gy + 1, (e.def.height * 0.42 + 4) * s * (hover ? 0.7 : 1), 0.3 * a);
+    if (e.boss) glow(ctx, enemyX(e), gy - 4, 60, '#ff3a3a', 0.18 + 0.06 * Math.sin(time * 4));
+    if (e.look.mega && e.look.phase > 1) {
+      const c = enemyCenter(e);
+      const k = e.look.phase - 1;
+      glow(ctx, c.x, c.y, e.def.height * (0.8 + 0.15 * k) * s, k > 1 ? '#ff2a4a' : '#ff7a2a', (0.22 + 0.1 * k + 0.08 * Math.sin(time * 7)) * a);
+      if (Math.random() < 0.25 * k) fx.particle({ x: c.x + (Math.random() - 0.5) * 70 * s, y: gy - 4, vx: 0, vy: -50 - Math.random() * 40, g: -10, life: 0.8, size: 2.4, kind: 'ember', color: k > 1 ? '#ff4a5a' : '#ff9a3a' });
+    }
     if (e.look.elite) {
       const c = enemyCenter(e);
       glow(ctx, c.x, c.y, e.def.height * 1.1, '#ffd23a', (0.4 + 0.12 * Math.sin(time * 6)) * a);
@@ -138,7 +156,7 @@ export function createRenderer(canvas) {
     }
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.translate(enemyX(), gy);
+    ctx.translate(enemyX(e), gy);
     ctx.scale(-s, s);
     tint.amount = e.flash > 0 ? Math.min(0.85, e.flash * 10) : 0;
     e.def.draw(ctx, P, e.look, e.out);
@@ -282,11 +300,11 @@ export function createRenderer(canvas) {
   // ---- Combat overlays (from live state) ----
 
   // Wind-up warning, stun stars and the shield bubble on the current enemy.
-  function enemyOverlays(state) {
+  function enemyOverlays(state, dt) {
     const e = state.enemy;
     if (!enemy || e.respawn > 0) return;
     const P = enemy.anim.pose;
-    const s = enemy.boss ? 1.5 : 1;
+    const s = sizeOf(enemy);
     const c = enemyCenter();
     const top = gy + (P.y - enemy.def.height) * s - (enemy.boss ? 26 : 10);
     if (e.shield > 0) {
@@ -317,6 +335,7 @@ export function createRenderer(canvas) {
     const a = e.attack;
     if (a && a.windup > 0) {
       const k = 1 - a.windup / ATTACK.windup;
+      if (enemy.def.special) chargeFx(enemy.def.special, c, s, dt);
       glow(ctx, c.x, gy - 6, 70 * s, '#ff2a2a', 0.25 + 0.2 * Math.sin(time * 18));
       line(ctx, circle(c.x, c.y, (enemy.def.height * 0.9 + 40 * (1 - k)) * s), '#ff5a4a', 3, 0.5 + 0.5 * k);
       // "!" bubble with one pip per tap still needed.
@@ -382,7 +401,7 @@ export function createRenderer(canvas) {
     }
     if (state.petFx.burn > 0 && enemy && state.enemy.respawn <= 0 && Math.random() < dt * 22) {
       const c = enemyCenter();
-      const s = enemy.boss ? 1.5 : 1;
+      const s = sizeOf(enemy);
       fx.particle({ x: c.x + (Math.random() * 30 - 15) * s, y: c.y + (Math.random() * 30 - 5) * s, vx: Math.random() * 10 - 5, vy: -40 - Math.random() * 30, g: -20, life: 0.5, size: 2.4 + Math.random() * 2, kind: 'ember', color: Math.random() < 0.5 ? '#ff7a2a' : '#ffd060' });
     }
   }
@@ -413,6 +432,131 @@ export function createRenderer(canvas) {
     }
   }
 
+  // ---- Zone boss moves ----
+
+  // Particles gathering while a zone boss winds up its special attack.
+  function chargeFx(kind, c, s, dt) {
+    const P = enemy.anim.pose;
+    const cols = enemy.look.colors;
+    if (kind === 'leaves' && Math.random() < dt * 30) {
+      const a = Math.random() * Math.PI * 2;
+      const top = gy + (P.y - enemy.def.height * 0.85) * s;
+      fx.particle({ x: c.x + Math.cos(a) * 46, y: top + Math.sin(a) * 18, vx: -Math.sin(a) * 70, vy: Math.cos(a) * 30 - 10, g: 20, life: 0.6, size: 3, kind: 'leaf', color: Math.random() < 0.5 ? cols.accent : lighter(cols.accent, 0.3), rot: a, vr: 8 });
+    } else if (kind === 'crystals' && Math.random() < dt * 26) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 44 * s;
+      fx.particle({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r * 0.7, vx: -Math.cos(a) * r * 2, vy: -Math.sin(a) * r * 1.4, g: 0, life: 0.45, size: 2.4, kind: 'star', color: cols.accent });
+    } else if (kind === 'charge' && Math.random() < dt * 14) {
+      // Snorting steam and hoof-scrape dust.
+      fx.puff(enemyX() - 30 * s, gy - 3, 6 + Math.random() * 5, '#e8dcc0', 0.45, -14);
+      fx.puff(c.x - 40 * s, gy + (P.y - enemy.def.height * 0.86) * s, 5, '#ffffff', 0.5, -26);
+    } else if (kind === 'venom' && Math.random() < dt * 24) {
+      const a = Math.random() * Math.PI * 2;
+      fx.particle({ x: c.x + Math.cos(a) * 50 * s, y: c.y + Math.sin(a) * 30 * s, vx: -Math.cos(a) * 80, vy: -Math.sin(a) * 50, g: 0, life: 0.5, size: 2.6, kind: 'ember', color: cols.accent });
+    } else if (kind === 'slam' && Math.random() < dt * 8) {
+      fx.puff(enemyX() + (Math.random() * 40 - 20) * s, gy - 2, 6 + Math.random() * 4, '#e8dcc0', 0.5, -12);
+    }
+  }
+
+  // The zone boss's hit: its effect travels to the hero, who is hurt when it arrives.
+  // Returns the delay in seconds before the hero flinches.
+  function specialAttack(kind) {
+    const e = enemy;
+    const s = sizeOf(e);
+    const cols = e.look.colors;
+    const later = (sec, fn) => setTimeout(fn, sec * 1000);
+    const hx = heroX() + hero.anim.pose.x;
+    const shakeHard = (t, m) => { if (!reduceMotion) { cam.shake = Math.max(cam.shake, t); cam.mag = Math.max(cam.mag, m); } };
+    if (kind === 'slam') {
+      const x0 = enemyX() - 52 * s;
+      later(0.14, () => {
+        fx.impact(x0, gy - 4, 1.6, '#ffe07a');
+        fx.ring(x0, gy - 2, 6, 50, '#f4e6c8', 0.4, 4);
+        fx.burst(x0, gy - 6, ['#8a6a4a', '#c8a878', '#6a5a4a'], 10, 150);
+        for (let i = 0; i < 4; i++) fx.puff(x0 + Math.random() * 30 - 15, gy - 4, 12, '#e8dcc0', 0.55, -18);
+        shakeHard(0.25, 6);
+      });
+      // A ripple of dust running along the ground toward the hero.
+      for (let i = 1; i <= 5; i++) {
+        later(0.14 + i * 0.045, () => {
+          const x = x0 + (hx - x0) * (i / 5);
+          fx.puff(x, gy - 3, 8 + i, '#e8dcc0', 0.45, -14);
+          fx.burst(x, gy - 4, ['#8a6a4a', '#c8a878'], 3, 90);
+        });
+      }
+      return 0.38;
+    }
+    if (kind === 'leaves') {
+      const from = { x: enemyX() - 20 * s, y: gy - e.def.height * 0.8 * s };
+      for (let i = 0; i < 10; i++) {
+        later(0.13 + i * 0.025, () => fx.shot({
+          x0: from.x + Math.random() * 30 - 15, y0: from.y + Math.random() * 30 - 15,
+          x1: hx + Math.random() * 24 - 6, y1: gy - 30 - Math.random() * 40,
+          kind: 'leaf', color: i % 2 ? cols.accent : lighter(cols.accent, 0.3), arc: 10 + Math.random() * 30, dur: 0.3,
+          onHit: () => fx.burst(hx + 10, gy - 46, [cols.accent, lighter(cols.accent, 0.4)], 3, 80, 'leaf'),
+        }));
+      }
+      return 0.48;
+    }
+    if (kind === 'charge') {
+      // Hooves pounding toward the hero, then the axe lands.
+      for (let i = 0; i < 6; i++) later(0.03 + i * 0.03, () => fx.puff(enemyX() - (10 + i * 12) * s, gy - 3, 9, '#e8dcc0', 0.5, -12));
+      later(0.18, () => {
+        fx.slash(hx + 16, gy - 50, 110, 1.1, '#ffffff', 0.25, 10);
+        fx.impact(hx + 12, gy - 8, 2, '#ffe07a');
+        fx.ring(hx + 12, gy - 2, 10, 80, '#f4e6c8', 0.45, 5);
+        fx.burst(hx + 12, gy - 8, ['#8a6a4a', '#c8a878', '#ffffff'], 16, 200);
+        shakeHard(0.35, 8);
+      });
+      return 0.2;
+    }
+    if (kind === 'venom') {
+      const from = { x: enemyX() - 50 * s, y: gy - 60 * s };
+      const n = 3 + (e.look.phase || 1);
+      for (let i = 0; i < n; i++) {
+        later(0.12 + i * 0.05, () => fx.shot({
+          x0: from.x, y0: from.y, x1: hx + Math.random() * 20 - 4, y1: gy - 26 - Math.random() * 40,
+          kind: 'orb', color: cols.accent, arc: 20 + i * 8, dur: 0.3,
+          onHit: () => {
+            fx.burst(hx + 10, gy - 40, [cols.accent, lighter(cols.accent, 0.4)], 6, 110);
+            fx.ring(hx + 10, gy - 40, 4, 30, cols.accent, 0.3, 3);
+          },
+        }));
+      }
+      return 0.44;
+    }
+    if (kind === 'crystals') {
+      const x0 = enemyX() - 42 * s;
+      later(0.14, () => {
+        fx.impact(x0, gy - 6, 1.5, cols.accent);
+        fx.ring(x0, gy - 2, 6, 46, cols.accent, 0.4, 4);
+        shakeHard(0.22, 5);
+      });
+      // Crystals burst out of the ground in a line, the last one under the hero.
+      for (let i = 1; i <= 6; i++) {
+        later(0.14 + i * 0.035, () => {
+          const x = x0 + (hx + 6 - x0) * (i / 6);
+          fx.spike(x, gy + 2, 16 + i * 3, 5 + i * 0.4, cols.accent);
+          fx.burst(x, gy - 6, [cols.accent, '#ffffff'], 3, 90);
+        });
+      }
+      return 0.36;
+    }
+    return 0.11;
+  }
+
+  // A zone boss crashing down: shake, a dust ring and flying stones on landing.
+  function bossLanding(e) {
+    if (e !== enemy) return;
+    const s = sizeOf(e);
+    const x = enemyX();
+    fx.ring(x, gy - 2, 10, 90 * s, '#f4e6c8', 0.5, 5);
+    fx.burst(x, gy - 8, ['#8a6a4a', '#c8a878', '#6a5a4a'], 16, 190);
+    for (let i = 0; i < 8; i++) fx.puff(x + (Math.random() * 2 - 1) * 50 * s, gy - 4, 12 + Math.random() * 8, '#e8dcc0', 0.7, -10 - Math.random() * 14);
+    if (!reduceMotion) { cam.shake = 0.45; cam.mag = 8; hitstop = 0.06; }
+    hero.anim.play('hurt');
+  }
+
   // ---- Events ----
 
   function queue(delay, fn) {
@@ -424,7 +568,7 @@ export function createRenderer(canvas) {
   function strike(ev) {
     if (!enemy) return;
     const c = enemyCenter();
-    const s = enemy.boss ? 1.5 : 1;
+    const s = sizeOf(enemy);
     enemy.flash = ev.crit ? 0.1 : 0.07;
     enemy.anim.play('hurt', ev.crit ? 1 : 0);
     const hx = c.x + (Math.random() * 10 - 5) * s;
@@ -469,6 +613,13 @@ export function createRenderer(canvas) {
     e.anim.play('die');
     dying.push({ e, t: 0, puffed: false });
     enemy = null;
+    if (ev.variant === 'raid') {
+      for (let i = 0; i < 3; i++) fx.ring(c.x, c.y, 10, 90 + i * 40, i ? '#ffe07a' : '#ffffff', 0.6 + i * 0.15, 5);
+      fx.burst(c.x, c.y, ['#ffe07a', '#ffffff', e.look.colors.accent], 40, 260, 'star');
+      hero.anim.play('cheer');
+      if (!reduceMotion) { cam.shake = 0.6; cam.mag = 9; hitstop = 0.2; }
+      return;
+    }
     dropCoins(c.x, c.y, ev.boss ? 14 : ev.variant === 'goblin' ? 18 : ev.variant === 'elite' ? 8 : 4);
     fx.number('+' + formatNumber(ev.gold), c.x, c.y - (e.boss ? 70 : 46), { size: 16, color: '#ffe680', color2: '#f0a020', life: 1.2, vy: 26 });
     if (ev.boss) {
@@ -514,6 +665,9 @@ export function createRenderer(canvas) {
     } else if (ev.type === 'heroHit') {
       enemy?.anim.stop('windup');
       enemy?.anim.play('attack');
+      const delay = enemy?.def.special ? specialAttack(enemy.def.special) : 0.11;
+      hitDelay = delay;
+      holdSync = time + delay + 0.15;
       setTimeout(() => {
         hero.anim.play('hurt');
         hero.flash = 0.15;
@@ -522,9 +676,9 @@ export function createRenderer(canvas) {
         fx.burst(hx + 10, gy - 50, ['#ff5a4a', '#ffffff'], 8, 120);
         fx.number('-' + formatNumber(ev.dmg), hx + 24, gy - 70, { size: 17, color: '#ff8a7a', color2: '#e0302a', life: 1, vy: 24 });
         if (!reduceMotion) { cam.shake = 0.22; cam.mag = 4.5; }
-      }, 110);
+      }, delay * 1000);
     } else if (ev.type === 'heroDown') {
-      setTimeout(() => hero.anim.play('down'), 140);
+      setTimeout(() => hero.anim.play('down'), (hitDelay + 0.03) * 1000);
     } else if (ev.type === 'shieldBreak') {
       if (enemy) {
         const c = enemyCenter();
@@ -532,6 +686,16 @@ export function createRenderer(canvas) {
         fx.ring(c.x, c.y, 20, 110, '#bff0ff', 0.5, 4);
         enemy.anim.play('hurt', 1);
         if (!reduceMotion) { cam.shake = 0.25; cam.mag = 5; hitstop = 0.1; }
+      }
+    } else if (ev.type === 'raidPhase') {
+      if (enemy) {
+        const c = enemyCenter();
+        enemy.look.phase = ev.phase;
+        enemy.anim.play('hurt', 1);
+        enemy.flash = 0.2;
+        fx.ring(c.x, c.y, 20, 150, ev.phase > 2 ? '#ff2a4a' : '#ff8a3a', 0.6, 6);
+        fx.burst(c.x, c.y, ['#ff5a3a', '#ffd060', '#ffffff'], 24, 220, 'ember');
+        if (!reduceMotion) { cam.shake = 0.5; cam.mag = 7; hitstop = 0.1; }
       }
     } else if (ev.type === 'petSkill') {
       petSkill(ev);
@@ -557,12 +721,17 @@ export function createRenderer(canvas) {
       if (ev.id === 'storm') { for (let i = 0; i < 6; i++) fx.slash(heroX() + 20, gy - 50, 60, (i / 6) * Math.PI, '#a8f4ff', 0.35, 6); }
       if (ev.id === 'focus') fx.ring(enemyX(), gy - 40, 60, 20, '#4ad0ff', 0.4, 3);
       if (ev.id === 'warcry' && pet) fx.ring(petX(), gy - 24, 10, 90, '#ffd060', 0.6, 4);
-    } else if (ev.type === 'spawn' || (ev.type === 'stage' && state.enemy.respawn <= 0)) {
+    } else if (ev.type === 'raidStart') {
+      holdSync = 0;
       sync(state);
+    } else if (ev.type === 'spawn' || (ev.type === 'stage' && state.enemy.respawn <= 0)) {
+      if (time < holdSync) syncLater = true;
+      else sync(state);
     }
   }
 
   function sync(state) {
+    syncLater = false;
     if (enemy) {
       // Stage switched with the enemy alive: it vanishes in a puff.
       const c = enemyCenter();
@@ -571,6 +740,10 @@ export function createRenderer(canvas) {
     enemy = makeEnemy(state);
     pending.length = 0;
     impactAt = 0;
+    if (enemy.look.zoneBoss || enemy.look.mega) {
+      const e = enemy;
+      pending.push({ at: time + enemy.def.actions.enter.dur * BOSS_LAND, fn: () => bossLanding(e) });
+    }
   }
 
   // ---- Frame ----
@@ -592,16 +765,21 @@ export function createRenderer(canvas) {
     watchSpeed(dt);
     if (hitstop > 0) { hitstop -= dt; dt *= 0.1; }
     time += dt;
+    if (syncLater && time >= holdSync) { syncLater = false; if (state.enemy.respawn <= 0) sync(state); }
     if (!enemy && state.enemy.respawn <= 0) sync(state);
     syncPet(state);
 
     const stage = enemy ? enemy.stage : state.stage;
     const zi = zoneIndex(stage);
-    const zone = ZONES[zi];
-    const key = `${zi}:${canvas.width}x${canvas.height}`;
+    // A mega boss fights in its own arena (kept through its death and the victory pause).
+    const megaId = enemy ? enemy.mega : state.enemy.variant === 'raid' ? state.enemy.mega : null;
+    const arena = megaId ? findMega(megaId) : null;
+    const theme = arena ? arena.theme : ZONES[zi].theme;
+    const seed = arena ? 100 + MEGA_BOSSES.indexOf(arena) : zi + 1;
+    const key = `${theme}:${canvas.width}x${canvas.height}`;
     if (key !== bgKey) {
-      bg = buildBackdrop(zone.theme, zi + 1);
-      weather = createWeather(zone.theme, W, gy, zi + 1);
+      bg = buildBackdrop(theme, seed);
+      weather = createWeather(theme, W, gy, seed);
       bgKey = key;
     }
 
@@ -636,6 +814,7 @@ export function createRenderer(canvas) {
     hero.anim.update(dt, state);
     if (pet) pet.anim.update(dt, state);
     if (enemy) {
+      if (enemy.look.mega && state.enemy.phase) enemy.look.phase = state.enemy.phase;
       enemy.anim.update(dt, state);
       enemy.flash = Math.max(0, enemy.flash - dt);
     }
@@ -680,14 +859,14 @@ export function createRenderer(canvas) {
       if (!d.puffed && d.t >= 0.2) {
         d.puffed = true;
         const c = enemyCenter(d.e);
-        const s = d.e.boss ? 1.5 : 1;
+        const s = sizeOf(d.e);
         for (let j = 0; j < 7; j++) fx.puff(c.x + (Math.random() * 40 - 20) * s, c.y + (Math.random() * 30 - 12) * s, (10 + Math.random() * 8) * s, '#f4f0ea', 0.55 + Math.random() * 0.2, -16 - Math.random() * 20);
         fx.burst(c.x, c.y, [d.e.look.colors.body, d.e.look.colors.accent], d.e.boss ? 18 : 9, 130);
       }
       if (d.t > (d.flee ? 0.85 : 0.7)) dying.splice(i, 1);
     }
     if (enemy && state.enemy.respawn <= 0) drawEnemy(enemy, dt);
-    enemyOverlays(state);
+    enemyOverlays(state, dt);
     petEffects(state, dt);
     heroBar(state);
     skillAuras(state, dt);
@@ -714,6 +893,8 @@ export function createRenderer(canvas) {
         coins.push({ x: 10 + Math.random() * (W - 20), y: -10 - Math.random() * 120, vx: Math.random() * 30 - 15, vy: Math.random() * 60, t: 0, drop: 1 + Math.random() * 0.5, spin: Math.random() * 6 });
       }
     },
+    // The special attack of the enemy on screen, if it is a zone boss (for its sound).
+    get enemySpecial() { return enemy?.def.special || null; },
     showBanner(textStr, color = '#c8353a', life = 1.6) { fx.banner(textStr, mix(color, '#3b1d3f', 0.22), life); },
     setCoinTarget(cssX, cssY) { coinTargetCss = { x: cssX, y: cssY }; },
     onCoinArrive(cb) { onCoin = cb; },

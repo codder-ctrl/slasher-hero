@@ -15,6 +15,7 @@ export function createFx() {
   const shots = [];
   const numbers = [];
   const slashes = [];
+  const spikes = [];
   let banner = null;
   let groundY = 1e9;
 
@@ -47,7 +48,7 @@ export function createFx() {
     text,
     setGround(y) { groundY = y; },
 
-    // Generic particle. kind: 'dot' | 'shard' | 'star' | 'ember'.
+    // Generic particle. kind: 'dot' | 'shard' | 'star' | 'ember' | 'leaf'.
     particle(p) { parts.push({ g: 260, size: 2, life: 0.6, kind: 'dot', rot: 0, vr: 0, ...p, max: p.life ?? 0.6 }); },
 
     burst(x, y, colors, n = 10, speed = 90, kind = 'shard') {
@@ -81,13 +82,16 @@ export function createFx() {
 
     shot(s) { shots.push({ t: 0, dur: 0.32, arc: 0, ...s }); },
 
+    // A crystal bursting out of the ground at (x, y), then sinking back.
+    spike(x, y, h, w, color, life = 0.6) { spikes.push({ x, y, h, w, color, t: 0, life, lean: (Math.random() - 0.5) * 0.4 }); },
+
     number(str, x, y, { size = 15, color = '#ffffff', color2 = null, life = 0.9, vy = 34, vx = 0 } = {}) {
       numbers.push({ str, x, y, size, color, color2, life, vy, vx, t: 0 });
     },
 
     banner(str, color = '#c8353a', life = 1.6) { banner = { str, color, t: 0, life }; },
 
-    clear() { parts.length = puffs.length = impacts.length = rings.length = shots.length = numbers.length = slashes.length = 0; banner = null; },
+    clear() { parts.length = puffs.length = impacts.length = rings.length = shots.length = numbers.length = slashes.length = spikes.length = 0; banner = null; },
 
     draw(g, dt, w) {
       // Rings (behind the rest).
@@ -108,6 +112,22 @@ export function createFx() {
         p.y += p.vy * dt;
         const s = p.r * (0.5 + ease.outCubic(k) * 0.8);
         at(g, p.x, p.y, p.rot + k * 0.6, () => blob(g, p.shape, p.color, { ow: 1.6 / s, depth: 0.25, alpha: 1 - ease.in(k), ink: darker(p.color, 0.55) }), s);
+      }
+
+      // Ground crystals: pop up with an overshoot, hold, then sink and fade.
+      for (let i = spikes.length - 1; i >= 0; i--) {
+        const sp = spikes[i];
+        sp.t += dt;
+        const k = sp.t / sp.life;
+        if (k >= 1) { spikes.splice(i, 1); continue; }
+        const grow = k < 0.2 ? ease.outBack(k / 0.2) : k > 0.7 ? 1 - ease.in((k - 0.7) / 0.3) * 0.6 : 1;
+        const a = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1;
+        const h = sp.h * grow;
+        glow(g, sp.x, sp.y - h * 0.5, sp.h * 0.8, sp.color, 0.35 * a);
+        at(g, sp.x, sp.y, sp.lean, () => {
+          blob(g, poly([[-sp.w, 0], [-sp.w * 0.75, -h * 0.72], [0, -h], [sp.w * 0.75, -h * 0.72], [sp.w, 0]]), sp.color, { ow: 1.8, depth: 1.6, light: '#ffffff', alpha: a });
+          line(g, (c) => { c.moveTo(0, -h + 2); c.lineTo(-sp.w * 0.15, -2); }, '#ffffff', 1.2, 0.6 * a);
+        });
       }
 
       // Projectiles.
@@ -131,6 +151,11 @@ export function createFx() {
             line(g, (c) => { c.moveTo(-12, 0); c.lineTo(3, 0); }, '#e8d0a0', 1.2);
             blob(g, poly([[2, -3], [9, 0], [2, 3]]), s.color, { ow: 1.2, depth: 0.6 });
             blob(g, poly([[-13, -3.4], [-8, 0], [-13, 3.4], [-11, 0]]), '#f4f0ea', { ow: 1, depth: 0.4, noLight: true });
+          });
+        } else if (s.kind === 'leaf') {
+          at(g, x, y, a + s.t * 14, () => {
+            blob(g, ellipse(0, 0, 8.4, 4), s.color, { ow: 1.4, depth: 1, light: '#ffffff' });
+            line(g, (c) => { c.moveTo(-8, 0); c.lineTo(7, 0); }, darker(s.color, 0.45), 1.2);
           });
         } else if (s.kind === 'orb') {
           glow(g, x, y, 14, s.color, 0.6);
@@ -157,6 +182,8 @@ export function createFx() {
           at(g, p.x, p.y, p.rot, () => blob(g, poly([[-p.size, -p.size * 0.6], [p.size, -p.size * 0.3], [p.size * 0.2, p.size * 0.8]]), p.color, { ow: 1, depth: 0.5, alpha: a, noLight: true }));
         } else if (p.kind === 'star') {
           flat(g, star(p.x, p.y, p.size * 1.6, p.size * 0.5, 4, p.rot), p.color, a);
+        } else if (p.kind === 'leaf') {
+          at(g, p.x, p.y, p.rot, () => blob(g, ellipse(0, 0, p.size * 1.6, p.size * 0.8), p.color, { ow: 1, depth: 0.5, alpha: a, noLight: true }));
         } else if (p.kind === 'ember') {
           glow(g, p.x, p.y, p.size * 3, p.color, 0.4 * a);
           flat(g, circle(p.x, p.y, p.size * 0.6), lighter(p.color, 0.5), a);

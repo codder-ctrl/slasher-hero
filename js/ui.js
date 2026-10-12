@@ -1,8 +1,9 @@
 import {
   UPGRADES, SKILLS, ZONES, KILLS_PER_STAGE, BOSS_TIME, PRESTIGE_MIN_STAGE, SOUL_BONUS, SPECIALS,
-  MILESTONE_EVERY, SPIRIT_STEP,
+  MILESTONE_EVERY, SPIRIT_STEP, RAID, RARITIES,
 } from './config.js';
 import * as L from './logic.js';
+import * as G from './gear.js';
 import { iconUrl } from './icons.js';
 import { VERSION } from './changelog.js';
 import { createPetPage } from './ui-pets.js';
@@ -10,6 +11,7 @@ import { createDungeonPage } from './ui-dungeon.js';
 import { createWindows } from './ui-windows.js';
 import { createBagButton, createGearScreen } from './ui-gear.js';
 import { createSoulTree } from './ui-souls.js';
+import { trophyText } from './ui-map.js';
 
 // DOM side of the game: HUD over the battle, the tabbed panel below it and modals.
 // It never changes game state itself; every action goes through the handlers from main.js.
@@ -382,7 +384,7 @@ export function createUI(h) {
 
   el.prev.addEventListener('click', () => h.stage(-1));
   el.next.addEventListener('click', () => h.stage(1));
-  el.auto.addEventListener('click', () => h.resumeAuto());
+  el.auto.addEventListener('click', () => (el.auto.classList.contains('danger') ? h.leaveRaid() : h.resumeAuto()));
 
   function updateHud(state) {
     set(el.gold, fmt(state.gold));
@@ -390,19 +392,20 @@ export function createUI(h) {
     el.soulsPill.hidden = state.souls <= 0;
     set(el.souls, fmt(state.souls));
 
-    const zone = ZONES[L.zoneIndex(state.stage)];
-    set(el.zone, zone.name);
-    set(el.stage, `Bölüm ${state.stage}`);
-    el.prev.disabled = state.stage <= 1;
-    el.next.disabled = state.stage >= state.maxStage;
-
     const e = state.enemy;
+    const raid = e.variant === 'raid' ? L.findMega(e.mega) : null;
+    const zone = ZONES[L.zoneIndex(state.stage)];
+    set(el.zone, raid ? raid.land : zone.name);
+    set(el.stage, raid ? `Mega Boss · Sv. ${e.level}` : `Bölüm ${state.stage}`);
+    el.prev.disabled = !!raid || state.stage <= 1;
+    el.next.disabled = !!raid || state.stage >= state.maxStage;
+
     if (e.respawn <= 0) {
-      const def = zone.enemies[e.kind] ?? zone.enemies[0];
+      const def = L.enemySpec(state);
       const name = e.variant === 'goblin' ? SPECIALS.goblin.name
         : e.variant === 'elite' ? `Elit ${def.name}`
           : e.variant === 'armored' ? `Zırhlı ${def.name}` : def.name;
-      set(el.enemyName, e.boss ? `BOSS · ${name}` : name);
+      set(el.enemyName, raid ? `MEGA BOSS · ${name}` : def.zoneBoss ? `BÖLGE BOSSU · ${name}` : e.boss ? `BOSS · ${name}` : name);
       el.enemyName.classList.toggle('boss', e.boss);
       el.enemyName.classList.toggle('special', e.variant === 'elite' || e.variant === 'goblin');
     }
@@ -412,19 +415,21 @@ export function createUI(h) {
     el.shieldFill.hidden = !(e.shield > 0);
     if (e.shield > 0) el.shieldFill.style.transform = `scaleX(${e.shield / e.shieldMax})`;
     set(el.hpText, e.shield > 0 ? `Kalkan ${fmt(Math.ceil(e.shield))}` : `${fmt(Math.max(0, Math.ceil(e.hp)))} / ${fmt(e.maxHp)}`);
-    set(el.progress, state.stage < state.maxStage ? '✓' : e.boss ? '' : `${state.kills}/${KILLS_PER_STAGE}`);
+    set(el.progress, raid ? `Evre ${e.phase}/3` : state.stage < state.maxStage ? '✓' : e.boss ? '' : `${state.kills}/${KILLS_PER_STAGE}`);
 
     // Bosses race the clock; a goblin counts down to its escape.
     const timed = e.boss || (e.variant === 'goblin' && e.respawn <= 0);
     el.timerBar.hidden = !timed;
     if (timed) {
-      const total = e.boss ? BOSS_TIME : SPECIALS.goblin.flee;
+      const total = raid ? RAID.time : e.boss ? BOSS_TIME : SPECIALS.goblin.flee;
       el.timerFill.style.transform = `scaleX(${Math.max(0, e.timeLeft / total)})`;
       set(el.timerText, `${e.boss ? '' : 'Kaçıyor · '}${Math.max(0, e.timeLeft).toFixed(1)} sn`);
     }
 
-    el.auto.hidden = state.autoAdvance;
-    set(el.auto, L.isBossStage(state.stage + 1) ? 'Boss\'a meydan oku ▶' : 'İlerlemeye devam ▶');
+    // In the arena the same button leaves the fight.
+    el.auto.hidden = raid ? e.respawn > 0 : state.autoAdvance;
+    el.auto.classList.toggle('danger', !!raid);
+    set(el.auto, raid ? 'Arenadan çık ✕' : L.isBossStage(state.stage + 1) ? 'Boss\'a meydan oku ▶' : 'İlerlemeye devam ▶');
     el.hint.hidden = state.stats.taps >= 3;
     updateSkillBar(state);
   }
@@ -493,6 +498,30 @@ export function createUI(h) {
     refresh() { lastPanel = 0; },
     get tab() { return tab; },
     showEgg(result, state) { openModal(petPage.eggResult(result, state)); },
+    // The reward card after a mega boss win.
+    showRaidWin(ev, state) {
+      const def = L.findMega(ev.id);
+      const body = [];
+      const line = (iconName, text, cls) => {
+        const row = make('div', `reward-line ${cls || ''}`);
+        const img = make('img');
+        img.alt = '';
+        img.src = icon(iconName, null, 26);
+        row.append(img, make('span', null, text));
+        body.push(row);
+      };
+      if (ev.reward.elmas) line('gem', `+${ev.reward.elmas} elmas`);
+      if (ev.reward.keys) line('keyIcon', `+${ev.reward.keys} Boss Anahtarı`);
+      if (ev.reward.kristal) line('crystal', `+${fmt(ev.reward.kristal)} kristal`);
+      if (ev.reward.item) {
+        line('chest', `${RARITIES[ev.reward.item.rarity].name} eşya: ${G.itemName(ev.reward.item)}`);
+        body.at(-1).style.color = RARITIES[ev.reward.item.rarity].color;
+      }
+      line('trophy', ev.first ? `Yeni kupa: ${def.trophy.name} · ${trophyText(def, ev.trophy)}` : `${def.trophy.name} Sv. ${ev.trophy} · ${trophyText(def, ev.trophy)}`, 'trophy');
+      body.push(make('p', 'note center', ev.first ? 'Kupa kalıcıdır, yeniden doğuşta da kalır.' : ''));
+      body.push(make('p', 'note center', `Sıradaki savaş: ${def.name} Sv. ${L.megaLevel(state, def)}. Daha güçlü, kupası da büyür.`));
+      openModal({ title: ev.first ? `${def.name} ilk kez yenildi!` : `${def.name} yenildi!`, body, actions: [{ label: 'Harika!', kind: 'accent' }] });
+    },
     setTab,
     openModal,
     closeModal,

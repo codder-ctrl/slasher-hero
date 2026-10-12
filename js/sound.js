@@ -236,11 +236,70 @@ export const sfx = {
     noise(0.15, { vol: 0.2, f0: 2500, q: 1.2 });
     [1319, 1568, 2093].forEach((f, i) => tone(f, 0.18, { type: 'triangle', vol: 0.05, delay: 0.08 + i * 0.06, wet: 0.4 }));
   },
-  heroHit() {
+  heroHit(delay = 0.1) {
     if (!ready()) return;
-    tone(95, 0.3, { slide: 0.45, vol: 0.5, delay: 0.1 });
-    noise(0.2, { vol: 0.25, type: 'lowpass', f0: 1400, f1: 300, delay: 0.1 });
-    tone(260, 0.18, { type: 'triangle', vol: 0.08, slide: 0.7, delay: 0.14 });
+    tone(95, 0.3, { slide: 0.45, vol: 0.5, delay });
+    noise(0.2, { vol: 0.25, type: 'lowpass', f0: 1400, f1: 300, delay });
+    tone(260, 0.18, { type: 'triangle', vol: 0.08, slide: 0.7, delay: delay + 0.04 });
+  },
+  // A zone boss crashing down: a roar, the thud of the landing, then the boss chord.
+  zoneBoss() {
+    if (!ready()) return;
+    noise(0.34, { vol: 0.12, f0: 300, f1: 1200, q: 1, attack: 0.2 });
+    noise(0.5, { vol: 0.45, type: 'lowpass', f0: 500, f1: 80, delay: 0.34 });
+    tone(55, 0.6, { slide: 0.5, vol: 0.6, delay: 0.34 });
+    tone(80, 1.1, { type: 'sawtooth', vol: 0.16, slide: 0.7, lp: 600, attack: 0.08, delay: 0.5 });
+    noise(1, { vol: 0.14, f0: 400, f1: 220, q: 2, attack: 0.1, delay: 0.5 });
+    for (const [f, d] of [[110, 0.7], [130.8, 0.7], [164.8, 0.95]]) tone(f, 1, { type: 'sawtooth', vol: 0.06, delay: d, lp: 900, attack: 0.05, wet: 0.5 });
+  },
+  // A mega boss enraging at a new phase: a deeper, longer roar each time.
+  megaRoar(phase = 2) {
+    if (!ready()) return;
+    const low = phase > 2 ? 45 : 60;
+    tone(low, 1.2, { type: 'sawtooth', vol: 0.2, slide: 0.6, lp: 700, attack: 0.05 });
+    noise(1.1, { vol: 0.22, f0: 300, f1: 160, q: 1.6, attack: 0.08 });
+    tone(low * 1.5, 1, { type: 'sawtooth', vol: 0.08, slide: 0.7, lp: 900, attack: 0.1, wet: 0.5 });
+    noise(0.4, { vol: 0.3, type: 'lowpass', f0: 500, f1: 90 });
+  },
+  // A mega boss beaten: a big fanfare.
+  megaWin() {
+    if (!ready()) return;
+    [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, { type: 'triangle', vol: 0.13, delay: 0.3 + i * 0.1, wet: 0.4 }));
+    for (const f of [523, 659, 784, 1047]) tone(f, 1.4, { type: 'sawtooth', vol: 0.035, delay: 0.85, lp: 2400, attack: 0.05, wet: 0.6 });
+    noise(0.8, { vol: 0.1, type: 'highpass', f0: 5000, attack: 0.3, delay: 0.8 });
+    tone(50, 0.8, { slide: 0.5, vol: 0.5 });
+  },
+  // A zone boss's special attack; timed with the effects in render.js (specialAttack).
+  bossAttack(kind) {
+    if (!ready()) return;
+    if (kind === 'slam') {
+      tone(60, 0.5, { slide: 0.5, vol: 0.6, delay: 0.14 });
+      noise(0.5, { vol: 0.4, type: 'lowpass', f0: 900, f1: 120, delay: 0.14 });
+      for (let i = 1; i <= 5; i++) noise(0.08, { vol: 0.1, type: 'lowpass', f0: 700, delay: 0.14 + i * 0.045 });
+      this.heroHit(0.38);
+    } else if (kind === 'leaves') {
+      noise(0.45, { vol: 0.22, f0: 500, f1: 3000, q: 1.2, attack: 0.15, delay: 0.08 });
+      for (let i = 0; i < 6; i++) noise(0.06, { vol: 0.07, type: 'highpass', f0: 4000, delay: 0.15 + i * 0.05 });
+      this.heroHit(0.48);
+    } else if (kind === 'charge') {
+      for (let i = 0; i < 5; i++) noise(0.07, { vol: 0.14, type: 'lowpass', f0: 600, delay: 0.02 + i * 0.035 });
+      noise(0.18, { vol: 0.2, f0: 800, f1: 3000, q: 1.4, delay: 0.1, attack: 0.04 });
+      tone(55, 0.5, { slide: 0.5, vol: 0.6, delay: 0.18 });
+      noise(0.4, { vol: 0.35, type: 'lowpass', f0: 1200, f1: 150, delay: 0.18 });
+      this.heroHit(0.2);
+    } else if (kind === 'venom') {
+      for (let i = 0; i < 5; i++) tone(rnd(300, 420), 0.18, { type: 'triangle', vol: 0.06, slide: 0.5, delay: 0.12 + i * 0.05 });
+      noise(0.3, { vol: 0.14, f0: 2000, f1: 600, q: 2, delay: 0.1 });
+      noise(0.2, { vol: 0.18, type: 'lowpass', f0: 900, f1: 300, delay: 0.44 });
+      this.heroHit(0.44);
+    } else if (kind === 'crystals') {
+      tone(70, 0.4, { slide: 0.5, vol: 0.5, delay: 0.14 });
+      noise(0.3, { vol: 0.25, type: 'lowpass', f0: 800, f1: 150, delay: 0.14 });
+      for (let i = 1; i <= 6; i++) ring(rnd(1300, 2000), 0.35, 0.035, 0.14 + i * 0.035);
+      this.heroHit(0.36);
+    } else {
+      this.heroHit();
+    }
   },
   heroDown() {
     if (!ready()) return;

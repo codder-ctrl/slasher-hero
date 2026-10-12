@@ -53,6 +53,19 @@ const THEMES = {
     ground: '#4a3438', road: '#5f4448', speck: '#2f2024', front: '#1f1418', flower: [],
     weather: 'embers',
   },
+  // Mega boss arenas (the Harita).
+  labyrinth: {
+    sky: ['#2a1838', '#7a3a4a', '#e8945a'], sun: '#ffd890',
+    far: '#a8784e', farTop: null, mid: '#8a6040', wall: '#c89a62', tree: null, torch: '#ffb43a',
+    ground: '#d8b47a', road: '#e8cc94', speck: '#b08850', front: '#8a6a48', flower: [],
+    weather: 'dust',
+  },
+  lair: {
+    sky: ['#0e0a18', '#1c1430', '#2a1f40'], ceiling: '#1e1830',
+    far: '#2a2240', farTop: null, mid: '#342a4c', tree: null, web: '#d8d2e8', egg: '#9ae04a',
+    ground: '#3a3050', road: '#4c4064', speck: '#2a2240', front: '#1a1428', flower: [],
+    weather: 'spores',
+  },
 };
 
 export const THEME_IDS = Object.keys(THEMES);
@@ -195,7 +208,7 @@ function ground(g, t, rand, w, h, gy, theme) {
   // Foreground clumps that frame the bottom edge.
   for (let x = -6; x < w + 20; x += 28 + rand() * 30) {
     const y = h + 4;
-    if (theme === 'cave' || theme === 'volcano' || theme === 'desert') rock(g, rand, x, y, 1.4 + rand(), t.front);
+    if (theme === 'cave' || theme === 'volcano' || theme === 'desert' || theme === 'labyrinth' || theme === 'lair') rock(g, rand, x, y, 1.4 + rand(), t.front);
     else blob(g, scallop(x, y, 16 + rand() * 8, 8 + rand() * 4, 7, 0.45, rand), t.front, { ow: 1.8, depth: 3 });
   }
   if (theme === 'volcano') {
@@ -227,7 +240,9 @@ export function paintBackdrop(g, theme, w, h, gy, seed = 1) {
     for (let i = 0; i < 26; i++) flat(g, circle(rand() * w, rand() * (horizon - 60), 0.5 + rand() * 0.8), '#ffffff', 0.4 + rand() * 0.5);
   }
 
-  if (theme === 'cave') {
+  if (theme === 'labyrinth' || theme === 'lair') {
+    arenaBackdrop(g, theme, t, rand, w, h, gy, horizon);
+  } else if (theme === 'cave') {
     // Back wall, hanging stalactites and crystal clusters.
     mountains(g, t, rand, w, horizon + 10, 120, t.far, null, 0);
     blob(g, (c) => {
@@ -296,8 +311,107 @@ export function paintBackdrop(g, theme, w, h, gy, seed = 1) {
       blob(g, (c) => { c.ellipse(x, y - 6, 5, 3.6, 0, Math.PI, 0); c.closePath(); }, t.glowShroom, { ow: 1.4, depth: 1 });
     }
   }
+  if (theme === 'lair') {
+    for (let i = 0; i < 3; i++) {
+      const x = rand() * w;
+      const y = gy + 22 + rand() * (h - gy - 26);
+      line(g, (c) => { for (let k = 0; k < 4; k++) { c.moveTo(x, y); c.lineTo(x + (k - 1.5) * 7, y + 3); } }, '#e8e0f0', 1, 0.7);
+      flat(g, ellipse(x, y + 2, 2.6, 1.6), '#e8e0f0', 0.8);
+    }
+  }
   if (theme === 'cave') {
     for (let i = 0; i < 3; i++) crystal(g, rand() * w, gy + 24 + rand() * (h - gy - 26), 0.7 + rand() * 0.5, t.crystal[i % 3], (rand() - 0.5) * 0.6);
+  }
+}
+
+// A torch on a pole with its flame and glow.
+function torch(g, x, y, s, color) {
+  at(g, x, y, 0, () => {
+    blob(g, roundRect(-1.6, -26, 3.2, 26, 1.4), '#5a3a26', { ow: 1.4, depth: 0.6 });
+    blob(g, roundRect(-4, -30, 8, 5, 2), '#6a6a7a', { ow: 1.4, depth: 0.6 });
+    glow(g, 0, -38, 22, color, 0.55);
+    blob(g, (c) => { c.moveTo(0, -48); c.quadraticCurveTo(7, -38, 3.5, -30); c.lineTo(-3.5, -30); c.quadraticCurveTo(-7, -38, 0, -48); c.closePath(); }, color, { ow: 1.4, depth: 1, light: '#fff2a8' });
+    flat(g, ellipse(0, -34, 2, 3.4), '#fff6c0', 0.9);
+  }, s);
+}
+
+// Maze walls of big sandstone blocks, with a dark archway every so often.
+function mazeWall(g, rand, x, top, wd, base, color) {
+  blob(g, roundRect(x, top, wd, base - top, 3), color, { ow: 1.8, depth: 5 });
+  line(g, (c) => {
+    for (let y = top + 12, row = 0; y < base; y += 12, row++) {
+      c.moveTo(x + 2, y); c.lineTo(x + wd - 2, y);
+      for (let bx = x + (row % 2 ? 9 : 18); bx < x + wd - 4; bx += 18) { c.moveTo(bx, y - 12); c.lineTo(bx, y); }
+    }
+  }, darker(color, 0.3), 1.2, 0.7);
+  for (let bx = x + 2; bx < x + wd - 8; bx += 14) blob(g, roundRect(bx, top - 7, 9, 8, 1.5), color, { ow: 1.6, depth: 1.6 });
+  if (wd > 60 && rand() < 0.8) {
+    const ax = x + wd * (0.3 + rand() * 0.4);
+    const aw = 20 + rand() * 8;
+    blob(g, (c) => { c.moveTo(ax - aw / 2, base); c.lineTo(ax - aw / 2, base - 30); c.quadraticCurveTo(ax, base - 50, ax + aw / 2, base - 30); c.lineTo(ax + aw / 2, base); c.closePath(); }, '#2a1a20', { ow: 1.6, shade: false, noLight: true });
+  }
+}
+
+// A cobweb fanning out from a corner at (x, y), spreading toward angle a0..a1.
+function cobweb(g, x, y, r, a0, a1, color) {
+  const spokes = 6;
+  line(g, (c) => {
+    for (let i = 0; i <= spokes; i++) {
+      const a = a0 + ((a1 - a0) * i) / spokes;
+      c.moveTo(x, y); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    for (let k = 1; k <= 4; k++) {
+      const rr = (r * k) / 4.4;
+      for (let i = 0; i <= spokes; i++) {
+        const a = a0 + ((a1 - a0) * i) / spokes;
+        const px = x + Math.cos(a) * rr;
+        const py = y + Math.sin(a) * rr;
+        if (i === 0) c.moveTo(px, py);
+        else {
+          const am = a - (a1 - a0) / spokes / 2;
+          c.quadraticCurveTo(x + Math.cos(am) * rr * 0.86, y + Math.sin(am) * rr * 0.86, px, py);
+        }
+      }
+    }
+  }, color, 1, 0.55);
+}
+
+function arenaBackdrop(g, theme, t, rand, w, h, gy, horizon) {
+  if (theme === 'labyrinth') {
+    glow(g, w * 0.5, horizon - 60, 120, '#ffb46a', 0.35);
+    // Far walls, then nearer, taller ones framing the arena.
+    for (let x = -20; x < w + 20;) {
+      const wd = 50 + rand() * 60;
+      mazeWall(g, rand, x, horizon - 64 - rand() * 18, wd, horizon + 12, t.far);
+      x += wd + 14 + rand() * 20;
+    }
+    mazeWall(g, rand, -30, horizon - 120, 70 + rand() * 20, horizon + 22, t.wall);
+    mazeWall(g, rand, w - 60 - rand() * 20, horizon - 128, 110, horizon + 22, t.wall);
+    for (const tx of [w * 0.12, w * 0.5, w * 0.88]) torch(g, tx, horizon + 20, 1, t.torch);
+  } else if (theme === 'lair') {
+    // Webbed cave: a dark ceiling with hanging cocoons, webs in the corners, glowing eggs.
+    mountains(g, t, rand, w, horizon + 10, 110, t.far, null, 0);
+    blob(g, (c) => {
+      c.moveTo(-10, -10); c.lineTo(w + 10, -10); c.lineTo(w + 10, 24);
+      for (let x = w + 10; x > -10; x -= 18 + rand() * 20) { c.lineTo(x - 5, 26 + rand() * 18); c.lineTo(x - 14, 22 + rand() * 6); }
+      c.lineTo(-10, 24); c.closePath();
+    }, t.ceiling, { ow: 1.6, depth: 5 });
+    for (let i = 0; i < 4; i++) {
+      const x = 20 + rand() * (w - 40);
+      const len = 30 + rand() * 50;
+      line(g, (c) => { c.moveTo(x, 20); c.lineTo(x, 20 + len); }, t.web, 1, 0.6);
+      blob(g, ellipse(x, 28 + len, 5, 10), '#c8c0d8', { ow: 1.6, depth: 2 });
+      line(g, (c) => { for (let k = -6; k <= 6; k += 4) { c.moveTo(x - 5, 28 + len + k); c.lineTo(x + 5, 28 + len + k + 2); } }, '#8a80a0', 1, 0.6);
+    }
+    cobweb(g, -4, -4, 90, 0.1, 1.45, t.web);
+    cobweb(g, w + 4, -4, 90, Math.PI - 1.45, Math.PI - 0.1, t.web);
+    hills(g, rand, w, horizon + 14, 36, t.mid);
+    for (let i = 0; i < 5; i++) {
+      const x = rand() * w;
+      const y = horizon + 12 + rand() * 6;
+      glow(g, x, y - 4, 12, t.egg, 0.4);
+      for (let k = 0; k < 3; k++) blob(g, ellipse(x + k * 6 - 6, y - 3 - (k % 2) * 3, 3.4, 4.4), lighter(t.egg, 0.2), { ow: 1.2, depth: 1, light: '#ffffff' });
+    }
   }
 }
 
@@ -341,7 +455,7 @@ export function createWeather(theme, w, gy, seed = 1) {
   const kind = t.weather;
   const rand = mulberry32(seed * 31 + 7);
   const items = [];
-  const n = { clouds: 4, fireflies: 14, sparkles: 16, snow: 60, embers: 34, dust: 18 }[kind] || 0;
+  const n = { clouds: 4, fireflies: 14, sparkles: 16, snow: 60, embers: 34, dust: 18, spores: 22 }[kind] || 0;
   for (let i = 0; i < n; i++) {
     items.push({
       x: rand() * w, y: rand() * gy, p: rand() * 6.28, s: 0.5 + rand(), r: rand(),
@@ -379,6 +493,13 @@ export function createWeather(theme, w, gy, seed = 1) {
           if (p.y < -4) { p.y = gy + 20; p.x = Math.random() * w; }
           glow(g, p.x, p.y, 4, '#ff8a3a', 0.5);
           flat(g, circle(p.x, p.y, 0.9 + p.r * 0.8), p.s > 1 ? '#ffe07a' : '#ff8a3a');
+        } else if (kind === 'spores') {
+          p.y -= p.s * 6 * dt;
+          if (p.y < -4) { p.y = gy + 10; p.x = Math.random() * w; }
+          const x = p.x + Math.sin(time * 0.8 + p.p) * 8;
+          const a = 0.5 + 0.5 * Math.sin(time * 1.4 + p.p * 2);
+          glow(g, x, p.y, 5, '#9ae04a', 0.45 * a);
+          flat(g, circle(x, p.y, 0.8 + p.r * 0.8), '#d8ff9a', 0.4 + 0.5 * a);
         } else if (kind === 'dust') {
           p.x += p.s * 20 * dt;
           if (p.x > w + 10) p.x = -10;

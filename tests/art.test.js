@@ -6,7 +6,7 @@ import { createAnimator } from '../js/anim.js';
 import { ICONS } from '../js/icons.js';
 import { paintBackdrop, paintDungeon, createWeather, THEME_IDS } from '../js/scenery.js';
 import { createFx } from '../js/fx.js';
-import { UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES, MAIL, SPECIALS, EQUIP_STATS, STAT_ORDER } from '../js/config.js';
+import { MEGA_BOSSES, UPGRADES, SKILLS, ZONES, PETS, COMPANIONS, DUNGEON, PET_TRAINING, FORM_MULT, RARITIES, MAIL, SPECIALS, EQUIP_STATS, STAT_ORDER } from '../js/config.js';
 import { NEWS } from '../js/news.js';
 import { existsSync } from 'node:fs';
 
@@ -34,6 +34,8 @@ function looksFor(id) {
   const looks = [];
   for (const z of ZONES) for (const e of z.enemies) if (e.actor === id) looks.push({ colors: e.colors }, { colors: e.colors, boss: true });
   for (const e of DUNGEON.enemies) if (e.actor === id) looks.push({ colors: e.colors });
+  for (const m of MEGA_BOSSES) if (m.actor === id) looks.push(...[1, 2, 3].map((phase) => ({ colors: m.colors, boss: true, mega: true, phase })));
+  for (const z of ZONES) if (z.boss?.actor === id) looks.push(...[z.boss.colors, ...z.boss.tours].map((colors) => ({ colors, boss: true })));
   for (const p of PETS) if (p.actor === id) p.forms.forEach((f, i) => looks.push({ colors: f.colors, form: i + 1 }));
   for (const c of COMPANIONS) if (c.actor === id) looks.push({ colors: c.colors, role: c.role, shotColor: c.shotColor });
   if (id === 'hero') looks.push({}, { rage: true }, { weapon: 3, helm: 3 }, { weapon: 1, helm: 2 });
@@ -47,6 +49,7 @@ test('content tables point at existing actors and icons', () => {
   for (const z of ZONES) {
     assert.ok(THEME_IDS.includes(z.theme), z.name);
     for (const e of z.enemies) assert.ok(ACTORS[e.actor], e.name);
+    if (z.boss) assert.ok(ACTORS[z.boss.actor]?.special, z.boss.name);
   }
   for (const e of DUNGEON.enemies) assert.ok(ACTORS[e.actor], e.actor);
   for (const p of PETS) assert.ok(ACTORS[p.actor], p.id);
@@ -72,6 +75,7 @@ test('pet forms and companions have every color their actors use', () => {
   }
   for (const c of COMPANIONS) for (const k of ['main', 'trim']) assert.match(c.colors[k] || '', /^#[0-9a-f]{6}$/, `${c.id} ${k}`);
   for (const z of ZONES) for (const e of z.enemies) for (const k of ['body', 'accent']) assert.match(e.colors[k] || '', /^#[0-9a-f]{6}$/, `${e.name} ${k}`);
+  for (const z of ZONES) for (const c of z.boss ? [z.boss.colors, ...z.boss.tours] : []) for (const k of ['body', 'accent']) assert.match(c[k] || '', /^#[0-9a-f]{6}$/, `${z.boss.name} ${k}`);
 });
 
 test('every actor draws every action at every stage with finite coordinates', () => {
@@ -201,7 +205,7 @@ test('blog posts and mails are complete and their covers exist', () => {
     if (n.cover.startsWith('scene:')) {
       const [, theme, enemy] = n.cover.split(':');
       assert.ok(THEME_IDS.includes(theme), n.id);
-      if (enemy) assert.ok(ZONES.some((z) => z.enemies.some((e) => e.actor === enemy)), n.id);
+      if (enemy) assert.ok(MEGA_BOSSES.some((m) => m.actor === enemy) || ZONES.some((z) => z.boss?.actor === enemy || z.enemies.some((e) => e.actor === enemy)), n.id);
     } else {
       assert.ok(existsSync(new URL(`../${n.cover}`, import.meta.url)), `${n.id}: missing ${n.cover}`);
     }

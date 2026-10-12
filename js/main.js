@@ -1,4 +1,4 @@
-import { AUTOSAVE_MS, OFFLINE_MIN, OFFLINE_CAP, SKILLS, COMBO, RARITIES } from './config.js';
+import { AUTOSAVE_MS, OFFLINE_MIN, OFFLINE_CAP, SKILLS, COMBO, RARITIES, MEGA_BOSSES } from './config.js';
 
 const COMBO_TIERS = COMBO.tiers;
 const comboTierAt = (count) => L.comboTier(count)?.at;
@@ -31,6 +31,8 @@ const dungeonCanvas = document.getElementById('dungeon-canvas');
 const dungeonView = createDungeonView(dungeonCanvas);
 
 function dispatch(events) {
+  // Leaving the arena brings back an ordinary enemy; its banner would hide the result.
+  const raidOver = events.some((ev) => ev.type === 'raidLose');
   for (const ev of events) {
     if (ev.type.startsWith('dg-')) {
       // The dungeon is only drawn while its tab is open.
@@ -60,10 +62,42 @@ function dispatch(events) {
       }
       case 'kill':
         sfx.kill();
-        if (ev.boss) { sfx.win(); renderer.showBanner('BOSS YENİLDİ!', '#e0a020'); }
+        if (ev.variant === 'raid') sfx.megaWin();
+        else if (ev.boss) { sfx.win(); renderer.showBanner('BOSS YENİLDİ!', '#e0a020'); }
+        break;
+      case 'raidStart': {
+        const m = L.findMega(ev.id);
+        sfx.zoneBoss();
+        renderer.showBanner(`${m.name.toLocaleUpperCase('tr-TR')}!`, '#5a1a6a', 1.8);
+        ui.closeWindow();
+        updateMusic();
+        break;
+      }
+      case 'unlock': {
+        // Passing a mega boss's stage for the first time ever opens its land on the map.
+        const m = MEGA_BOSSES.find((x) => !x.soon && x.unlock + 1 === ev.stage && state.stats.bestStage === ev.stage);
+        if (m) {
+          sfx.quest();
+          renderer.showBanner('YENİ MEGA BOSS!', '#5a1a6a', 2);
+          ui.toast(`${m.land} açıldı: ${m.name} seni bekliyor! Menü → Harita`);
+        }
+        break;
+      }
+      case 'raidPhase':
+        sfx.megaRoar(ev.phase);
+        renderer.showBanner(ev.phase > 2 ? 'SON EVRE: ÇILDIRDI!' : 'ÖFKELENDİ!', ev.phase > 2 ? '#a01a3a' : '#c8501a', 1.4);
+        break;
+      case 'raidWin':
+        renderer.showBanner('MEGA ZAFER!', '#e0a020', 2);
+        setTimeout(() => ui.showRaidWin(ev, state), 1300);
+        break;
+      case 'raidLose':
+        if (ev.why !== 'left') sfx.fail();
+        renderer.showBanner(ev.why === 'time' ? 'SÜRE DOLDU!' : ev.why === 'down' ? 'BAYILDIN!' : 'ARENADAN ÇIKTIN', '#6a3a5a', 1.4);
+        updateMusic();
         break;
       case 'elmas':
-        ui.toast(`İlk boss zaferi: +${ev.amount} elmas`);
+        ui.toast(ev.zoneBoss ? `Bölge bossu ilk kez yenildi: +${ev.amount} elmas` : `İlk boss zaferi: +${ev.amount} elmas`);
         break;
       case 'bossFail':
         sfx.fail();
@@ -72,9 +106,17 @@ function dispatch(events) {
         break;
       case 'spawn':
       case 'stage':
-        if (state.enemy.respawn <= 0 && state.enemy.boss) {
-          sfx.boss();
-          renderer.showBanner(state.enemy.shield > 0 ? 'KALKANLI BOSS!' : 'BOSS!', '#c8353a', 1.2);
+        if (raidOver) {
+          updateMusic();
+        } else if (state.enemy.respawn <= 0 && state.enemy.boss) {
+          const spec = L.enemySpec(state);
+          if (spec.zoneBoss) {
+            sfx.zoneBoss();
+            renderer.showBanner(`${spec.name.toLocaleUpperCase('tr-TR')}!`, '#8a2a6a', 1.5);
+          } else {
+            sfx.boss();
+            renderer.showBanner(state.enemy.shield > 0 ? 'KALKANLI BOSS!' : 'BOSS!', '#c8353a', 1.2);
+          }
         } else if (state.enemy.respawn <= 0 && state.enemy.variant === 'goblin') {
           sfx.goblin();
           renderer.showBanner('HAZİNE GOBLİNİ!', '#3f9a45', 1.3);
@@ -93,7 +135,9 @@ function dispatch(events) {
         sfx.interrupt();
         break;
       case 'heroHit':
-        sfx.heroHit();
+        // renderer.handle already ran: a zone boss's special has its own timing.
+        if (renderer.enemySpecial) sfx.bossAttack(renderer.enemySpecial);
+        else sfx.heroHit();
         break;
       case 'heroDown':
         sfx.heroDown();
@@ -153,6 +197,28 @@ const ui = createUI({
       // Stepping back means farming; reaching the frontier turns auto-advance back on.
       state.autoAdvance = state.stage === state.maxStage;
       dispatch(events);
+    }
+  },
+  startRaid(id) {
+    unlockAudio();
+    const events = [];
+    if (L.startRaid(state, id, events)) dispatch(events);
+    ui.refresh();
+  },
+  leaveRaid() {
+    const events = [];
+    if (L.leaveRaid(state, events)) dispatch(events);
+  },
+  buyRaidKey() {
+    if (L.buyRaidKey(state)) { sfx.buy(); ui.refresh(); }
+  },
+  // A jump from the map.
+  goToStage(stage) {
+    const events = [];
+    if (L.setStage(state, stage, Math.random, events)) {
+      state.autoAdvance = state.stage === state.maxStage;
+      dispatch(events);
+      ui.refresh();
     }
   },
   useSkill: activateSkill,
@@ -508,7 +574,7 @@ function loop(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   dispatch(L.tick(state, dt, Math.random, []));
-  if ((questCheck -= dt) <= 0) { questCheck = 5; if (L.ensureQuests(state)) ui.refresh(); }
+  if ((questCheck -= dt) <= 0) { questCheck = 5; if (L.ensureQuests(state) | L.refreshRaidKeys(state)) ui.refresh(); }
   renderer.frame(state, dt);
   if (ui.tab === 'dungeon') dungeonView.frame(state, dt);
   ui.update(state, now);

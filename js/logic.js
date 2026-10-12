@@ -7,7 +7,7 @@ import {
   PET_DPS_GROWTH, EGG_COST, STARTING_ELMAS, BOSS_ELMAS, STARTER_PET, FORM_MULT, STAR_BONUS, MAX_STARS,
   DUPLICATE_KRISTAL, RARITIES, PETS, COMPANIONS, STARTER_TEAM, TEAM_SIZE, DAILY, MAIL,
   HERO, COMBO, ATTACK, SHIELD, SPECIALS, QUESTS, QUESTS_PER_DAY, QUEST_BONUS, ACHIEVEMENTS, ACHIEVEMENT_ELMAS,
-  ABILITY_FORM_MULT, EQUIP,
+  ABILITY_FORM_MULT, EQUIP, ZONE_BOSS_ELMAS, RAID, MEGA_BOSSES,
 } from './config.js';
 import { tickDungeon } from './dungeon.js';
 import { newEquipment, gearTotals, dropItem, loadEquipment } from './gear.js';
@@ -57,6 +57,7 @@ export function newGame(rng = Math.random, now = Date.now()) {
     daily: { last: '', streak: 0 },  // last claim as a local YYYY-MM-DD and the streak it made
     mail: { claimed: [], read: [] },
     seen: { version: '', news: [] }, // what the player has opened in the blog (for the badge)
+    raid: { keys: 0, day: '', wins: {} },  // mega boss keys (refilled per local day) and wins by id
     enemy: null,
     lastSeen: now,
   };
@@ -69,6 +70,33 @@ export function newGame(rng = Math.random, now = Date.now()) {
 
 export const isBossStage = (stage) => stage % BOSS_EVERY === 0;
 export const zoneIndex = (stage) => Math.floor((stage - 1) / STAGES_PER_ZONE) % ZONES.length;
+// The last stage of every zone holds its zone boss.
+export const isZoneBossStage = (stage) => stage % STAGES_PER_ZONE === 0;
+// Tours: one pass through all the zones (stages 1–60, 61–120, …), counted from 0.
+export const TOUR_LENGTH = STAGES_PER_ZONE * ZONES.length;
+export const tourIndex = (stage) => Math.floor((stage - 1) / TOUR_LENGTH);
+
+// The zone boss of a stage's zone, in its colors for that tour.
+export function zoneBoss(stage) {
+  const boss = ZONES[zoneIndex(stage)].boss;
+  if (!boss) return null;
+  const tour = tourIndex(stage);
+  const colors = tour > 0 && boss.tours?.length ? boss.tours[(tour - 1) % boss.tours.length] : boss.colors;
+  return { actor: boss.actor, name: boss.name, colors, tour };
+}
+
+// What the current enemy is: { actor, name, colors }, plus `zoneBoss` for a zone boss.
+export function enemySpec(state, e = state.enemy, stage = state.stage) {
+  if (e.variant === 'goblin') return SPECIALS.goblin;
+  if (e.variant === 'raid') {
+    const m = findMega(e.mega);
+    return { actor: m.actor, name: m.name, colors: m.colors, mega: true };
+  }
+  const zb = e.boss && isZoneBossStage(stage) ? zoneBoss(stage) : null;
+  if (zb) return { ...zb, zoneBoss: true };
+  const zone = ZONES[zoneIndex(stage)];
+  return zone.enemies[e.kind] ?? zone.enemies[0];
+}
 
 export function enemyMaxHp(stage, boss = false) {
   const hp = HP_BASE * HP_GROWTH ** (stage - 1);
@@ -118,6 +146,7 @@ export function spawnEnemy(state, rng = Math.random) {
 
 // Moves to another unlocked stage and spawns its enemy right away.
 export function setStage(state, stage, rng = Math.random, events = []) {
+  if (inRaid(state)) return false;
   stage = clamp(Math.round(stage), 1, state.maxStage);
   if (stage === state.stage) return false;
   state.stage = stage;
@@ -135,8 +164,9 @@ export const soulMultiplier = (state) => 1 + state.souls * SOUL_BONUS;
 const passive = (state, id) => { const a = petAbility(state); return a?.id === id ? a.power : 0; };
 
 export const goldMultiplier = (state) => (1 + state.upgrades.greed * GREED_STEP)
-  * (1 + gearTotals(state).gold) * (1 + treeValue(state, 'goldPower')) * (1 + passive(state, 'scan'));
-export const critMultiplier = (state) => BASE_CRIT_MULT + state.upgrades.critDmg * CRIT_MULT_STEP + gearTotals(state).critDmg;
+  * (1 + gearTotals(state).gold) * (1 + treeValue(state, 'goldPower')) * (1 + passive(state, 'scan')) * (1 + trophyValue(state, 'gold'));
+export const critMultiplier = (state) => BASE_CRIT_MULT + state.upgrades.critDmg * CRIT_MULT_STEP + gearTotals(state).critDmg
+  + trophyValue(state, 'critDmg');
 
 export function critChance(state) {
   const base = Math.min(MAX_CRIT_CHANCE, BASE_CRIT_CHANCE + state.upgrades.crit * CRIT_CHANCE_STEP);
@@ -167,7 +197,7 @@ export function petMultiplier(state, id) {
 // Pet damage per second without Savaş Narası (the shop shows base values).
 export function petDps(state, level = state.training[PET_TRAINING.id], id = state.activePet) {
   return trainingDps(level) * petMultiplier(state, id) * soulMultiplier(state)
-    * (1 + gearTotals(state).pet) * (1 + treeValue(state, 'petPower'));
+    * (1 + gearTotals(state).pet) * (1 + treeValue(state, 'petPower')) * (1 + trophyValue(state, 'pet'));
 }
 
 // The active pet's ability with its power scaled by the evolution form, or null.
@@ -188,13 +218,13 @@ export function swordDamage(state, level = state.upgrades.sword) {
 
 export function tapDamage(state, spirit = state.upgrades.spirit) {
   return (swordDamage(state) + totalDps(state) * spirit * SPIRIT_STEP) * activeSkillPower(state, 'rage', 1)
-    * (1 + gearTotals(state).tap) * (1 + treeValue(state, 'tapPower'));
+    * (1 + gearTotals(state).tap) * (1 + treeValue(state, 'tapPower')) * (1 + trophyValue(state, 'tap'));
 }
 
 // ---- Hero health, armor and combo ----
 
 export function heroMaxHp(state, level = state.upgrades.vitality) {
-  return Math.round(HERO.hpBase * HERO.hpGrowth ** level * soulMultiplier(state) * (1 + gearTotals(state).hp));
+  return Math.round(HERO.hpBase * HERO.hpGrowth ** level * soulMultiplier(state) * (1 + gearTotals(state).hp) * (1 + trophyValue(state, 'hp')));
 }
 
 export const heroArmor = (state, level = state.upgrades.armor) => HERO.armorPerLevel * level + gearTotals(state).armor;
@@ -203,9 +233,10 @@ export const heroArmor = (state, level = state.upgrades.armor) => HERO.armorPerL
 export const damageTakenMultiplier = (armor) => HERO.armorK / (HERO.armorK + Math.max(0, armor));
 
 // Damage of one landed attack by the current enemy, after armor.
-export function attackDamage(state, e = state.enemy, stage = state.stage) {
+// A mega boss hits at the strength of its own stage (`atkStage`), times its `atkMult`.
+export function attackDamage(state, e = state.enemy, stage = e.atkStage || state.stage) {
   const ease = Math.min(1, stage / ATTACK.ramp);
-  const base = ATTACK.atkBase * ATTACK.atkGrowth ** (stage - 1) * ease * (e.boss ? 1 : ATTACK.eliteAtk);
+  const base = ATTACK.atkBase * ATTACK.atkGrowth ** (stage - 1) * ease * (e.boss ? 1 : ATTACK.eliteAtk) * (e.atkMult || 1);
   return base * damageTakenMultiplier(heroArmor(state));
 }
 
@@ -299,6 +330,7 @@ const VARIANT_GOLD = { goblin: SPECIALS.goblin.gold, elite: SPECIALS.elite.gold 
 
 function killEnemy(state, events, rng = Math.random) {
   const e = state.enemy;
+  if (e.variant === 'raid') { raidWon(state, events, rng); return; }
   const gold = enemyGold(state, state.stage, e.boss) * (VARIANT_GOLD[e.variant] || 1);
   e.hp = 0;
   e.respawn = RESPAWN_DELAY;
@@ -318,8 +350,10 @@ function killEnemy(state, events, rng = Math.random) {
         state.stats.bestStage = state.maxStage;
         // A boss beaten for the first time ever pays elmas and an item.
         if (e.boss) {
-          state.elmas += BOSS_ELMAS;
-          events.push({ type: 'elmas', amount: BOSS_ELMAS });
+          const zone = isZoneBossStage(state.stage);
+          const amount = BOSS_ELMAS + (zone ? ZONE_BOSS_ELMAS : 0);
+          state.elmas += amount;
+          events.push({ type: 'elmas', amount, zoneBoss: zone });
           e.dropped = true;
           dropItem(state, rng, events, 'boss');
         }
@@ -359,6 +393,7 @@ function damageEnemy(state, dmg, events, { crit = false, pet = false, rng = Math
   out.dmg = dmg;
   e.hp -= dmg;
   if (e.hp <= 0) killEnemy(state, events, rng);
+  else if (e.variant === 'raid') updatePhase(e, events);
   return out;
 }
 
@@ -418,7 +453,7 @@ function updateAttack(state, dt, rng, events) {
     a.windup -= dt;
     if (a.windup > 0) return;
     a.windup = 0;
-    a.cd = e.boss ? ATTACK.every : ATTACK.eliteEvery;
+    a.cd = e.every || (e.boss ? ATTACK.every : ATTACK.eliteEvery);
     const dmg = attackDamage(state);
     state.hero.hp -= dmg;
     events.push({ type: 'heroHit', dmg });
@@ -437,7 +472,7 @@ function updateAttack(state, dt, rng, events) {
   }
   a.cd -= dt;
   if (a.cd <= 0) {
-    a.windup = ATTACK.windup;
+    a.windup = e.windupTime || ATTACK.windup;
     a.need = ATTACK.taps;
     events.push({ type: 'windup' });
   }
@@ -475,7 +510,9 @@ function heroDown(state, rng, events) {
   state.stats.heroDowns++;
   state.hero.hp = heroMaxHp(state);
   events.push({ type: 'heroDown', boss: e.boss });
-  if (e.boss) {
+  if (e.variant === 'raid') {
+    raidLost(state, events, rng, 'down');
+  } else if (e.boss) {
     state.autoAdvance = false;
     events.push({ type: 'bossFail', down: true });
     setStage(state, state.stage - 1, rng, events);
@@ -523,7 +560,9 @@ export function tick(state, dt, rng = Math.random, events = []) {
   }
   if (e.boss && e.hp > 0) {
     e.timeLeft -= dt;
-    if (e.timeLeft <= 0) {
+    if (e.timeLeft <= 0 && e.variant === 'raid') {
+      raidLost(state, events, rng, 'time');
+    } else if (e.timeLeft <= 0) {
       // Failing a boss drops back a stage and stops auto-advance until the player retries.
       state.autoAdvance = false;
       events.push({ type: 'bossFail' });
@@ -654,7 +693,7 @@ export function prestige(state, rng = Math.random) {
   fresh.soulTree = state.soulTree;
   fresh.soulPoints = state.soulPoints + gain;
   // Pets, gems, companions and the dungeon are permanent.
-  for (const k of ['pets', 'activePet', 'elmas', 'kristal', 'companions', 'dungeon', 'dungeonRun', 'daily', 'mail', 'seen']) fresh[k] = state[k];
+  for (const k of ['pets', 'activePet', 'elmas', 'kristal', 'companions', 'dungeon', 'dungeonRun', 'daily', 'mail', 'seen', 'raid']) fresh[k] = state[k];
   Object.assign(state, fresh);
   const start = 1 + treeValue(state, 'startStage');
   if (start > 1) {
@@ -956,10 +995,141 @@ export function loadState(raw, rng = Math.random, now = Date.now()) {
     const got = int(raw.achievements?.[a.id], 0);
     if (got > 0) s.achievements[a.id] = Math.min(a.tiers.length, got);
   }
+  if (day.test(raw.raid?.day)) s.raid.day = raw.raid.day;
+  s.raid.keys = Math.min(99, int(raw.raid?.keys, 0));
+  for (const m of MEGA_BOSSES) {
+    const w = int(raw.raid?.wins?.[m.id], 0);
+    if (w > 0 && !m.soon) s.raid.wins[m.id] = w;
+  }
   s.lastSeen = num(raw.lastSeen, now);
   s.hero.hp = heroMaxHp(s);
   spawnEnemy(s, rng);
   return s;
+}
+
+// ---- Mega bosses (the Harita arena) ----
+// A mega boss fight replaces state.enemy with the boss (variant 'raid'); the main battle is
+// put back with a fresh enemy when it ends. Taps, the pet, skills and wind-ups work as usual.
+
+export const findMega = (id) => MEGA_BOSSES.find((m) => m.id === id);
+export const inRaid = (state) => state.enemy?.variant === 'raid';
+export const megaUnlocked = (state, def) => !def.soon && state.stats.bestStage > def.unlock;
+export const megaWins = (state, def) => state.raid.wins[def.id] || 0;
+// Level of the next fight: 1 until the first win, then one more per win.
+export const megaLevel = (state, def) => Math.min(RAID.maxLevel, megaWins(state, def) + 1);
+export const megaHp = (def, level) => Math.ceil(enemyMaxHp(def.unlock, true) * RAID.hpMult * RAID.levelGrowth ** (level - 1));
+export const trophyLevel = (state, def) => Math.min(RAID.maxLevel, megaWins(state, def));
+export const trophyPower = (def, level) => (level > 0 ? def.trophy.base + def.trophy.step * (level - 1) : 0);
+
+// Sum of the trophies of a kind; 'all' trophies count for tap and pet damage.
+export function trophyValue(state, kind) {
+  if (!state.raid) return 0;
+  let v = 0;
+  for (const m of MEGA_BOSSES) {
+    const t = m.trophy;
+    if (t.kind === kind || (t.kind === 'all' && (kind === 'tap' || kind === 'pet'))) v += trophyPower(m, trophyLevel(state, m));
+  }
+  return v;
+}
+
+// Tops the keys back up to keysPerDay on a new local day (bought extras are kept).
+export function refreshRaidKeys(state, now = Date.now()) {
+  const d = dayKey(now);
+  if (state.raid.day === d) return false;
+  state.raid.day = d;
+  state.raid.keys = Math.max(state.raid.keys, RAID.keysPerDay);
+  return true;
+}
+
+export function buyRaidKey(state) {
+  if (state.elmas < RAID.keyCost) return false;
+  state.elmas -= RAID.keyCost;
+  state.raid.keys++;
+  return true;
+}
+
+export function canStartRaid(state, def, now = Date.now()) {
+  refreshRaidKeys(state, now);
+  return !!def && megaUnlocked(state, def) && !inRaid(state) && state.raid.keys > 0;
+}
+
+export function startRaid(state, id, events = [], now = Date.now()) {
+  const def = findMega(id);
+  if (!canStartRaid(state, def, now)) return false;
+  state.raid.keys--;
+  const level = megaLevel(state, def);
+  const maxHp = megaHp(def, level);
+  state.enemy = {
+    kind: 0, boss: true, variant: 'raid', mega: def.id, level, phase: 0,
+    hp: maxHp, maxHp, shield: 0, shieldMax: 0,
+    timeLeft: RAID.time + treeValue(state, 'bossTime'), respawn: 0, stun: 0,
+    atkStage: def.unlock, atkMult: 0, every: 0, windupTime: 0,
+    attack: { cd: RAID.firstAttack, windup: 0, need: 0 },
+  };
+  setPhase(state.enemy, 1);
+  state.hero.hp = heroMaxHp(state);
+  state.petFx.burn = 0;
+  events.push({ type: 'raidStart', id: def.id, level });
+  return true;
+}
+
+function setPhase(e, phase) {
+  const i = phase - 1;
+  e.phase = phase;
+  e.atkMult = RAID.atkMult * RAID.atkLevel ** (e.level - 1) * RAID.phaseAtk[i];
+  e.every = RAID.phaseEvery[i];
+  e.windupTime = RAID.phaseWindup[i];
+}
+
+// Below 66% and 33% HP the boss gets angry: harder, faster attacks, and the next one comes soon.
+function updatePhase(e, events) {
+  const share = e.hp / e.maxHp;
+  const phase = share <= RAID.phases[1] ? 3 : share <= RAID.phases[0] ? 2 : 1;
+  if (phase <= e.phase) return;
+  setPhase(e, phase);
+  if (e.attack.windup <= 0) e.attack.cd = Math.min(e.attack.cd, 1.2);
+  events.push({ type: 'raidPhase', phase });
+}
+
+function raidWon(state, events, rng) {
+  const e = state.enemy;
+  const def = findMega(e.mega);
+  const first = megaWins(state, def) === 0;
+  e.hp = 0;
+  e.respawn = RAID.leaveDelay;
+  state.stats.bossKills++;
+  const reward = { elmas: 0, kristal: 0, item: null, keys: 0 };
+  if (first) {
+    reward.elmas = def.first.elmas;
+    reward.keys = RAID.firstKeys;
+    reward.item = dropItem(state, rng, events, 'mega', def.first.rarity);
+  } else {
+    reward.elmas = RAID.repeat.elmas;
+    reward.kristal = RAID.repeat.kristal * (MEGA_BOSSES.indexOf(def) + 1) * e.level;
+    if (rng() < RAID.repeat.itemChance) reward.item = dropItem(state, rng, events, 'mega', 1);
+  }
+  state.elmas += reward.elmas;
+  state.kristal += reward.kristal;
+  state.raid.keys += reward.keys;
+  state.raid.wins[def.id] = megaWins(state, def) + 1;
+  events.push({ type: 'kill', gold: 0, boss: true, variant: 'raid' });
+  events.push({ type: 'raidWin', id: def.id, first, level: e.level, reward, trophy: trophyLevel(state, def) });
+}
+
+// Lost (time ran out, knocked out, or left): the key comes back and the main battle returns.
+function raidLost(state, events, rng, why) {
+  const e = state.enemy;
+  state.raid.keys++;
+  state.hero.hp = heroMaxHp(state);
+  events.push({ type: 'raidLose', id: e.mega, why });
+  spawnEnemy(state, rng);
+  events.push({ type: 'spawn' });
+}
+
+export function leaveRaid(state, events = [], rng = Math.random) {
+  if (!inRaid(state) || state.enemy.respawn > 0) return false;
+  raidLost(state, events, rng, 'left');
+  return true;
 }
 
 // ---- Formatting ----

@@ -2,7 +2,7 @@ import {
   INK, at, blob, line, flat, glow, ellipse, circle, roundRect, smooth, poly, capsule, star, darker, lighter,
 } from './paint.js';
 import { ACTORS } from './actors.js';
-import { PETS, COMPANIONS, ZONES } from './config.js';
+import { PETS, COMPANIONS, ZONES, MEGA_BOSSES } from './config.js';
 import { paintBackdrop } from './scenery.js';
 
 // UI icons in the same vector style, drawn into a 64-unit square. `ICONS` holds the plain
@@ -271,6 +271,31 @@ ICONS.bagMenu = (g) => {
   blob(g, roundRect(28, 34, 8, 9, 2.4), '#fff8e6', { ow: 2.2, depth: 0.8 });
 };
 
+// A folded treasure map with a dotted trail and a red X.
+ICONS.mapIcon = (g) => {
+  blob(g, poly([[6, 14], [22, 8], [42, 14], [58, 8], [58, 50], [42, 56], [22, 50], [6, 56]]), '#f2dfae', { depth: 3, light: '#fff6dc' });
+  flat(g, poly([[22, 8], [42, 14], [42, 56], [22, 50]]), '#d8c08a', 0.6);
+  line(g, (c) => { c.moveTo(22, 8); c.lineTo(22, 50); c.moveTo(42, 14); c.lineTo(42, 56); }, '#a88a5a', 1.6);
+  flat(g, ellipse(16, 22, 6, 4), '#6ab04a', 0.8);
+  flat(g, ellipse(50, 42, 5, 3.6), '#6ab04a', 0.8);
+  line(g, (c) => { c.moveTo(13, 46); c.bezierCurveTo(22, 30, 34, 44, 38, 30); c.quadraticCurveTo(41, 22, 47, 20); }, '#8a4a2a', 2.4);
+  line(g, (c) => { c.moveTo(43, 16); c.lineTo(52, 25); c.moveTo(52, 16); c.lineTo(43, 25); }, INK, 6);
+  line(g, (c) => { c.moveTo(43, 16); c.lineTo(52, 25); c.moveTo(52, 16); c.lineTo(43, 25); }, '#e0413b', 3);
+  blob(g, circle(13, 46, 3.6), GOLD, { ow: 1.6, depth: 0.8 });
+};
+
+// A gold key with a red gem: the mega boss key.
+ICONS.keyIcon = (g) => {
+  glow(g, 32, 32, 28, '#ffd060', 0.35);
+  at(g, 32, 32, -0.75, () => {
+    blob(g, roundRect(-4, -2, 34, 8, 3), GOLD, { depth: 1.6, light: '#fff2a8' });
+    blob(g, roundRect(20, 5, 5, 9, 1.6), GOLD, { depth: 1, ow: 2 });
+    blob(g, roundRect(10, 5, 5, 7, 1.6), GOLD, { depth: 1, ow: 2 });
+    blob(g, circle(-12, 2, 14), GOLD, { depth: 3, light: '#fff2a8' });
+    blob(g, circle(-12, 2, 6), '#e0413b', { ow: 1.8, depth: 1.4, light: '#ff9a8a' });
+  });
+};
+
 ICONS.daily = (g) => {
   glow(g, 32, 36, 30, '#ffd060', 0.4);
   blob(g, roundRect(10, 28, 44, 28, 4), '#d8443e', { depth: 3 });
@@ -340,10 +365,40 @@ export function coverUrl(spec, width = 360, height = 160) {
   at(g, W * 0.36, gy, 0, () => hero.draw(g, { ...hero.rest, armF: -1.7, elbowF: -0.5, sword: 1.1, mouth: 0.8, cape: 1 }, {}, null), 1);
   const def = ACTORS[enemy];
   if (def) {
-    const spec2 = ZONES.flatMap((z) => z.enemies).find((e) => e.actor === enemy);
+    const spec2 = [...ZONES.flatMap((z) => [...z.enemies, ...(z.boss ? [z.boss] : [])]), ...MEGA_BOSSES].find((e) => e.actor === enemy);
     const look = { colors: spec2.colors, boss: true };
     const P = { ...def.rest, ...def.idle(0.3, look), blink: 0 };
-    at(g, W * 0.72, gy, 0, () => def.draw(g, P, look, null), -1.25, 1.25);
+    const s = def.bossScale ? 1 / Math.max(1, def.height / 100) : 1.25;
+    at(g, W * 0.72, gy, 0, () => def.draw(g, P, look, null), -s, s);
+  }
+  url = c.toDataURL('image/jpeg', 0.88);
+  urls.set(key, url);
+  return url;
+}
+
+// A zone's picture for the map: its backdrop with the zone boss (or its first enemy) standing in
+// it. `boss` is { actor, colors } or null.
+export function zoneArtUrl(theme, boss, width = 120, height = 90) {
+  const key = `zone:${theme}:${boss ? boss.actor + JSON.stringify(boss.colors) : '-'}:${width}x${height}`;
+  let url = urls.get(key);
+  if (url) return url;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const c = document.createElement('canvas');
+  c.width = Math.round(width * dpr);
+  c.height = Math.round(height * dpr);
+  const g = c.getContext('2d');
+  const H = 130;
+  const k = c.height / H;
+  const W = c.width / k;
+  g.scale(k, k);
+  const gy = 112;
+  paintBackdrop(g, theme, W, H, gy, 3);
+  const def = boss && ACTORS[boss.actor];
+  if (def) {
+    const look = { colors: boss.colors, boss: true };
+    const P = { ...def.rest, ...def.idle(0.3, look), blink: 0 };
+    const s = 88 / (def.height + 8);
+    at(g, W * 0.5, gy + 4, 0, () => def.draw(g, P, look, null), -s, s);
   }
   url = c.toDataURL('image/jpeg', 0.88);
   urls.set(key, url);

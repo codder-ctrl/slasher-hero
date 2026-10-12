@@ -3,6 +3,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.6.0',
+    date: '2026-10-12',
+    notes: [
+      'YENİ: Mega Boss Haritası (menüde). Ana yolculuktan ayrı arenalarda dev bosslar: 100. bölümü geçince Minotor (Taş Labirent), 200. bölümü geçince Örümcek Kraliçe (Zehirli Yuva). Dört diyar daha yakında.',
+      'Mega savaş 60 saniye sürer ve 3 evrelidir: boss canı azaldıkça öfkelenir, daha sık ve sert vurur. Saldırıları yine 5 hızlı dokunuşla kesilir. İstersen "Arenadan çık" ile ayrılabilirsin.',
+      'Her gün 3 Boss Anahtarı; fazlası 30 elmas. Yenilirsen ya da arenadan çıkarsan anahtarın geri gelir; bir bossu ilk kez yenince 1 anahtar hediye.',
+      'İlk zafer: bol elmas, Destansı eşya ve kalıcı bir kupa (Minotor: dokunuş hasarı, Örümcek Kraliçe: pet hasarı). Sonraki zaferler daha az öder ama bossu ve kupasını bir seviye büyütür.',
+      'Bölüm bossları: Yeşil Çayır, Karanlık Orman ve Kristal Mağara’nın son bölümlerinde artık özel çizilmiş bosslar var (Goblin Şef, Kadim Ağaç, Kristal Golem). Gökten inerler, kendi saldırılarıyla vururlar; ilk zafer +25 elmas.',
+    ],
+  },
+  {
     version: '0.5.1',
     date: '2026-10-11',
     notes: [

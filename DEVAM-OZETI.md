@@ -1,6 +1,6 @@
 # Slasher Hero — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-11. Canlı sürüm: **v0.5.1**.
+Son güncelleme: 2026-10-11. Canlı sürüm: **v0.6.0**.
 
 ## Proje
 
@@ -49,6 +49,16 @@ Son güncelleme: 2026-10-11. Canlı sürüm: **v0.5.1**.
   - Güç özeti tek ince satır oldu: simge ve değer yan yana, dokununca adı yazar.
   - Ekipman ekranında kahraman daha büyük ve daha yukarıda; kılıcın ucu artık kesilmiyor (`PORTRAIT_SHIFT`).
 
+- **0.6.0:**
+  - Bölüm bossları (ana oyun): Goblin Şef (Çayır), Kadim Ağaç (Orman), Kristal Golem (Mağara) — `js/bosses.js`. Gökten iniş, kükreme, özel saldırılar; ilk zafer +25 elmas. Çöl/Buz/Volkan bölüm bossları **sonra** çizilecek (kullanıcı seçti).
+  - **Mega Boss Haritası** (kullanıcının isteğiyle yeniden tasarlandı: harita ana yolun kopyası değil, ayrı savaş alanı):
+    - 6 diyar, her 100 bölümde bir mega boss açılır (en iyi bölüm 100'ü geçince Minotor, 200 → Örümcek Kraliçe; Kraken 300, Tepegöz 400, Lich Kral 500, Kara Ejderha 600 "yakında").
+    - Ana oyundaki 100. bölümde gelmezler; sadece haritadan, Boss Anahtarı ile (günde 3, +1 = 30 elmas). Kullanıcının isteği: yenilince (ya da çıkınca) anahtar iade, ilk zaferde +1 anahtar.
+    - 60 sn, 3 evre (öfkelenir), ayrı arenalar (Taş Labirent, Zehirli Yuva). "Arenadan çık" düğmesi.
+    - İlk zafer çok ödül (elmas + Destansı eşya + kalıcı kupa), tekrar zaferler daha az (kullanıcının isteği) ama boss ve kupa seviye atlar.
+    - Denge: `node tools/sim.js --mega` → ilk turda ~110. bölümde Minotor Sv.1 ≈ 55 sn.
+  - **Kalan iş (2. parça):** Kraken, Tepegöz, Lich Kral, Kara Ejderha çizimleri + arenaları (`MEGA_BOSSES`'ta `soon: true` kaldır, `actor`, `theme`, `colors`, `first` ekle; `special` için render.js `specialAttack`/`chargeFx`, sound.js `bossAttack`).
+
 ## Kullanıcının puanları (v0.1 sonrası)
 
 Akıcılık 9, grafik 8, efektler 8, ses 9, oynanış 7. Kullanıcı stili ve sesleri sevdi; oynanış geliştirmeleri bunun üzerine yapıldı.
@@ -78,7 +88,7 @@ Akıcılık 9, grafik 8, efektler 8, ses 9, oynanış 7. Kullanıcı stili ve se
 
 ## Sıradaki adaylar (kullanıcı henüz seçmedi)
 
-1. **Dünya haritası ve bölüm sonu bossları:** Her bölge sonunda özel çizilmiş büyük boss ve bölgeleri gösteren bir harita ekranı.
+1. **Mega boss 2. parça** (4 boss) ve Çöl/Buz/Volkan bölüm bossları.
 2. **Sezonluk etkinlikler:** Duyurular (`js/news.js`) ve Posta (`MAIL`) buna hazır.
 3. **Lider tablosu:** Sunucu kurulumu gerekiyor.
 4. **Kullanıcının telefonda 0.5.1'i denedikten sonra vereceği geri bildirim.**

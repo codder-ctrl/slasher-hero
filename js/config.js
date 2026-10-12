@@ -134,6 +134,7 @@ export const PET_DPS_GROWTH = 1.045;  // per training level; under the 1.07 cost
 export const EGG_COST = 100;          // elmas per random pet
 export const STARTING_ELMAS = 0;      // new players get their first 100 from the welcome mail
 export const BOSS_ELMAS = 10;         // first time each main-battle boss stage is beaten (all-time)
+export const ZONE_BOSS_ELMAS = 25;    // extra on top for the zone boss at the end of each zone
 export const STARTER_PET = 'dog';
 export const FORM_MULT = [1, 2.5, 6];
 export const STAR_BONUS = 0.2;        // +20% pet damage per duplicate
@@ -404,6 +405,8 @@ export const DUNGEON = {
 
 // Zones cycle every STAGES_PER_ZONE stages. `theme` picks the painted backdrop in js/scenery.js;
 // each enemy is a vector actor (js/monsters.js) recolored with `body` and `accent`.
+// `boss` is the zone boss on the zone's last stage (js/bosses.js); after the first tour of all
+// zones (a "tur") it comes back in the `tours` colors, one per later tour, cycling.
 export const ZONES = [
   {
     name: 'Yeşil Çayır',
@@ -413,6 +416,10 @@ export const ZONES = [
       { actor: 'bat',      name: 'Mor Yarasa',     colors: { body: '#6a3f86', accent: '#d0607a' } },
       { actor: 'mushroom', name: 'Kızıl Mantar',   colors: { body: '#d8443e', accent: '#f7e6c4' } },
     ],
+    boss: {
+      actor: 'goblinChief', name: 'Goblin Şef', colors: { body: '#7cc65a', accent: '#8a5a32' },
+      tours: [{ body: '#d8a84a', accent: '#5a3a8a' }, { body: '#6a7ad8', accent: '#3a2a2a' }],
+    },
   },
   {
     name: 'Karanlık Orman',
@@ -422,6 +429,10 @@ export const ZONES = [
       { actor: 'slime',    name: 'Bataklık Balçığı', colors: { body: '#3f8f72', accent: '#9ad890' } },
       { actor: 'skeleton', name: 'Orman İskeleti',   colors: { body: '#d6dcb8', accent: '#8cff6a' } },
     ],
+    boss: {
+      actor: 'treant', name: 'Kadim Ağaç', colors: { body: '#7a5232', accent: '#58a83e' },
+      tours: [{ body: '#6a4a3a', accent: '#e07a2a' }, { body: '#4a4a5a', accent: '#c06ad8' }],
+    },
   },
   {
     name: 'Kristal Mağara',
@@ -431,6 +442,10 @@ export const ZONES = [
       { actor: 'slime',    name: 'Kristal Balçık',  colors: { body: '#4aa8f0', accent: '#b0f6ff' } },
       { actor: 'skeleton', name: 'Madenci İskelet', colors: { body: '#f2f0e6', accent: '#6fe8f4' } },
     ],
+    boss: {
+      actor: 'golem', name: 'Kristal Golem', colors: { body: '#8a8ca4', accent: '#6fe8f4' },
+      tours: [{ body: '#a88a6a', accent: '#ff7ad0' }, { body: '#4a4e62', accent: '#ffd23a' }],
+    },
   },
   {
     name: 'Kızıl Çöl',
@@ -459,4 +474,53 @@ export const ZONES = [
       { actor: 'slime',    name: 'Magma Balçığı',  colors: { body: '#c0384a', accent: '#ff9a3a' } },
     ],
   },
+];
+
+// ---- Mega bosses (Harita) ----
+// Fights in a separate arena, opened from the map; the main battle waits meanwhile. Boss i
+// unlocks once the all-time best stage passes `unlock` and is fought at the strength of that
+// stage: HP = the boss HP there × hpMult × levelGrowth^(level − 1), `time` seconds (plus the
+// soul tree's Sabır), and three phases (from the HP shares in `phases`) that hit harder and
+// more often. Entering costs a key: keysPerDay come back each local day, more cost elmas; a
+// lost fight gives its key back and a first win adds one.
+// The first win pays `first` (elmas, an item of at least `rarity`) and the trophy; every later
+// win pays the smaller RAID.repeat, and the boss and its trophy go up a level (up to maxLevel).
+// Trophies are permanent: `kind` tap / pet / gold / hp / critDmg / all, worth
+// base + step × (level − 1).
+export const RAID = {
+  time: 60,
+  hpMult: 10,
+  levelGrowth: 2.5,
+  maxLevel: 10,
+  atkMult: 6,
+  atkLevel: 1.4,                 // attack × this per boss level
+  phases: [0.66, 0.33],
+  phaseAtk: [1, 1.25, 1.6],
+  phaseEvery: [5, 4, 3],         // seconds between attacks
+  phaseWindup: [1.4, 1.4, 1.2],
+  firstAttack: 2.5,
+  keysPerDay: 3,
+  keyCost: 30,                   // elmas
+  firstKeys: 1,                  // keys given on a boss's first win (a lost fight refunds its key)
+  leaveDelay: 2.2,               // seconds of victory before the main battle comes back
+  repeat: { elmas: 15, kristal: 40, itemChance: 0.3 },  // kristal × (boss number) × level
+};
+
+export const MEGA_BOSSES = [
+  {
+    id: 'minotaur', name: 'Minotor', land: 'Taş Labirent', theme: 'labyrinth', actor: 'minotaur', unlock: 100,
+    colors: { body: '#8a5236', accent: '#e8dcc0' },
+    first: { elmas: 150, rarity: 2 },
+    trophy: { kind: 'tap', base: 0.15, step: 0.05, name: 'Boğa Boynuzu' },
+  },
+  {
+    id: 'spider', name: 'Örümcek Kraliçe', land: 'Zehirli Yuva', theme: 'lair', actor: 'spiderQueen', unlock: 200,
+    colors: { body: '#3e2a52', accent: '#9ae04a' },
+    first: { elmas: 200, rarity: 2 },
+    trophy: { kind: 'pet', base: 0.25, step: 0.08, name: 'Zehir Dişi' },
+  },
+  { id: 'kraken', name: 'Kraken', land: 'Batık Liman', unlock: 300, soon: true, trophy: { kind: 'gold', base: 0.3, step: 0.1, name: 'Mürekkep Kesesi' } },
+  { id: 'cyclops', name: 'Tepegöz', land: 'Dev Dağı', unlock: 400, soon: true, trophy: { kind: 'hp', base: 0.3, step: 0.1, name: 'Dev Gözü' } },
+  { id: 'lich', name: 'Lich Kral', land: 'Lanetli Kale', unlock: 500, soon: true, trophy: { kind: 'critDmg', base: 0.5, step: 0.15, name: 'Lanetli Taç' } },
+  { id: 'dragon', name: 'Kara Ejderha', land: 'Ejder Yuvası', unlock: 600, soon: true, trophy: { kind: 'all', base: 0.25, step: 0.08, name: 'Ejder Kalbi' } },
 ];

@@ -76,12 +76,13 @@ export function isWorse(state, item) {
 
 // A new random item into the bag. It is salvaged for kristal at once when the bag is full, or
 // when it is weaker than the worn one and Otomatik parçala (settings.autoSalvage) is on.
-export function dropItem(state, rng = Math.random, events = [], source = 'boss') {
+// `minRarity` raises the rolled rarity (mega boss rewards); those are never auto-salvaged.
+export function dropItem(state, rng = Math.random, events = [], source = 'boss', minRarity = 0) {
   const eq = state.equipment;
   const slot = EQUIP_SLOTS[Math.floor(rng() * EQUIP_SLOTS.length)].id;
-  const item = makeItem(slot, rollRarityIndex(rng), rng, eq.next++);
+  const item = makeItem(slot, Math.max(minRarity, rollRarityIndex(rng)), rng, eq.next++);
   let salvaged = 0;
-  const auto = !!state.settings?.autoSalvage && isWorse(state, item);
+  const auto = source !== 'mega' && !!state.settings?.autoSalvage && isWorse(state, item);
   if (auto || eq.bag.length >= EQUIP.bagSize) {
     salvaged = salvageValue(item);
     state.kristal += salvaged;
